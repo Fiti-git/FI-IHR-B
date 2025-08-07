@@ -101,3 +101,7 @@ celerybeat-schedule
 # Windows
 Thumbs.db
 ehthumbs.db
+
+# Doc
+project_docs
+support_docs

@@ -41,7 +41,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',   
     'drf_yasg',         
-    'api',
     'support',
     'project',
     'rest_framework_simplejwt.token_blacklist',
