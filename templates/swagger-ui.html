@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>IhrHub Custom Swagger UI</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/swagger-ui-dist/swagger-ui.css"
+  />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #login-btn {
+      margin: 10px;
+      padding: 8px 16px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #007bff;
+      border: none;
+      color: white;
+      border-radius: 4px;
+    }
+    #login-btn:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <button id="login-btn">Login & Set Bearer Token</button>
+  <div id="swagger-ui"></div>
+
+  <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>
+
+  <script>
+    window.onload = function () {
+      const ui = SwaggerUIBundle({
+        url: "/swagger.json",
+        dom_id: "#swagger-ui",
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: "BaseLayout",
+        requestInterceptor: (req) => {
+          // Optional: log requests for debugging
+          // console.log("Request intercepted:", req);
+          return req;
+        },
+      });
+
+      async function loginAndSetToken() {
+        try {
+          const response = await fetch("/api/token/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: "1", password: "1" }),
+          });
+
+          if (!response.ok) {
+            alert("Login failed: " + response.statusText);
+            return;
+          }
+
+          const data = await response.json();
+
+          if (data.access) {
+            // Set the Bearer token (must match your SWAGGER_SETTINGS scheme name "Bearer")
+            ui.preauthorizeApiKey("Bearer", "Bearer " + data.access);
+            alert("Token set successfully!");
+          } else {
+            alert("No access token received");
+          }
+        } catch (error) {
+          alert("Login error: " + error.message);
+          console.error(error);
+        }
+      }
+
+      document.getElementById("login-btn").addEventListener("click", loginAndSetToken);
+    };
+  </script>
+</body>
+</html>
