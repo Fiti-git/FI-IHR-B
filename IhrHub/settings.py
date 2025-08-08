@@ -44,7 +44,12 @@ INSTALLED_APPS = [
     'support',
     'project',
     'rest_framework_simplejwt.token_blacklist',
-    'accounts'
+    'accounts',
+    'corsheaders',
+    'channels',
+    'apps.user',
+    'apps.chat',
+    
 ] 
 
 REST_FRAMEWORK = {
