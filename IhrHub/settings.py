@@ -44,13 +44,30 @@ INSTALLED_APPS = [
     'support',
     'project',
     'rest_framework_simplejwt.token_blacklist',
-    'accounts',
-    'corsheaders',
-    'channels',
-    'apps.user',
+    'myapi',
     'apps.chat',
-    
-] 
+    'user',
+    'rest_framework.authtoken',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
+    'allauth.socialaccount.providers.google',
+]
+
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+)
+
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USERNAME_REQUIRED = False
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -60,6 +77,20 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
  }
+
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_HTTPONLY': False, # allows JWT to be read by JS
+    # We will use a custom serializer to return user details upon login
+    'USER_DETAILS_SERIALIZER': 'myapi.serializers.UserDetailsSerializer',
+    # Custom Social Login View
+    'SOCIAL_LOGIN_SERIALIZER': 'myapi.serializers.CustomSocialLoginSerializer',
+}
+
+SOCIALACCOUNT_ADAPTER = 'myapi.adapter.CustomSocialAccountAdapter'
+
+LOGIN_REDIRECT_URL = '/auth/success/'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/'
 
 SIMPLE_JWT = {
      'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),

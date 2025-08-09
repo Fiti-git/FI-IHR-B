@@ -1,6 +1,13 @@
 from rest_framework import serializers
 from apps.chat.models import ChatRoom, ChatMessage
-from apps.user.serializers import UserSerializer
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name']
 
 class ChatRoomSerializer(serializers.ModelSerializer):
 	member = UserSerializer(many=True, read_only=True)
@@ -18,7 +25,6 @@ class ChatRoomSerializer(serializers.ModelSerializer):
 
 class ChatMessageSerializer(serializers.ModelSerializer):
 	userName = serializers.SerializerMethodField()
-	userImage = serializers.ImageField(source='user.image')
 
 	class Meta:
 		model = ChatMessage

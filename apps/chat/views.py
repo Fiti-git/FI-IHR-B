@@ -15,8 +15,9 @@ class ChatRoomView(APIView):
 		return Response(serializer.data, status=status.HTTP_200_OK)
 
 	def post(self, request):
+		temp_data = {'members': [1, 2], 'type': "DM"}
 		serializer = ChatRoomSerializer(
-			data=request.data, context={"request": request}
+			data=temp_data, context={"request": request}
 		)
 		if serializer.is_valid():
 			serializer.save()

@@ -1,0 +1,48 @@
+<!-- templates/myapi/auth_success.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Authentication Successful</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; padding: 2em; max-width: 800px; margin: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; }
+        h1 { color: #2c8f2c; margin: 0; }
+        .token { background-color: #f0f0f0; padding: 10px; border-radius: 5px; word-wrap: break-word; font-family: monospace; margin-bottom: 1em; }
+        strong { color: #333; }
+        .logout-button { background-color: #d9534f; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <!--
+      We'll wrap the H1 and the new logout button in a div
+      to easily style them with flexbox.
+    -->
+    <div class="header">
+        <h1>Authentication Successful!</h1>
+        <a href="{% url 'account_logout' %}" class="logout-button">Sign Out</a>
+    </div>
+
+    <hr> <!-- A horizontal line for separation -->
+
+    <p>Welcome, <strong>{{ user.first_name }} {{ user.last_name }}</strong>!</p>
+
+    <h2>Your User Details:</h2>
+    <ul>
+        <li><strong>Email:</strong> {{ user.email }}</li>
+        <li><strong>Username:</strong> {{ user.username }}</li>
+        <li><strong>User ID (pk):</strong> {{ user.pk }}</li>
+    </ul>
+
+    <h2>Your JWT Tokens:</h2>
+    <p>You can now use this <strong>Access Token</strong> to make requests to protected API endpoints.</p>
+
+    <h3>Access Token:</h3>
+    <div class="token">{{ access_token }}</div>
+
+    <h3>Refresh Token:</h3>
+    <div class="token">{{ refresh_token }}</div>
+
+</body>
+</html>
