@@ -1,7 +1,13 @@
 # myapi/serializers.py
 from rest_framework import serializers
 from dj_rest_auth.serializers import UserDetailsSerializer
-from dj_rest_auth.registration.serializers import SocialLoginSerializer
+from dj_rest_auth.registration.serializers import SocialLoginSerializer, VerifyEmailSerializer
+from django.conf import settings
+
+class CustomVerifyEmailSerializer(VerifyEmailSerializer):
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        return attrs
 
 # A custom serializer to return more user detail
 class UserDetailsSerializer(UserDetailsSerializer):

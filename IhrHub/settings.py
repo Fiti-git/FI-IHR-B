@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     'dj_rest_auth',
     'dj_rest_auth.registration',
     'allauth.socialaccount.providers.google',
+    'anymail',
+    'django.contrib.sites',
 ]
 
 SITE_ID = 1
@@ -63,11 +65,20 @@ AUTHENTICATION_BACKENDS = (
     'allauth.account.auth_backends.AuthenticationBackend',
 )
 
-ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = False
+
+EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
+DEFAULT_FROM_EMAIL = "noreply@zomotopos.site"
+
+ANYMAIL = {
+    "MAILGUN_API_KEY": "",
+    "MAILGUN_SENDER_DOMAIN": "zomotopos.site",
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -85,6 +96,8 @@ REST_AUTH = {
     'USER_DETAILS_SERIALIZER': 'myapi.serializers.UserDetailsSerializer',
     # Custom Social Login View
     'SOCIAL_LOGIN_SERIALIZER': 'myapi.serializers.CustomSocialLoginSerializer',
+    'VERIFY_EMAIL_SERIALIZER': 'myapi.serializers.CustomVerifyEmailSerializer',
+    'ACCOUNT_CONFIRM_EMAIL_URL': '/api/auth/registration/verify-email/?key={key}',
 }
 
 SOCIALACCOUNT_ADAPTER = 'myapi.adapter.CustomSocialAccountAdapter'
@@ -100,7 +113,7 @@ SIMPLE_JWT = {
  }
 
 MIDDLEWARE = [
-     'corsheaders.middleware.CorsMiddleware',  
+    'corsheaders.middleware.CorsMiddleware',  
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -112,6 +125,16 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://192.168.1.7:3000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+]
+
+CSRF_TRUSTED_ORIGINS  = [
+    "http://localhost:5173",
+    "http://192.168.1.7:3000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
 ]
 
 CORS_ALLOW_CREDENTIALS = True

@@ -6,18 +6,94 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login</title>
+    <title>Login or Sign Up</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f7f7f7; }
-        .login-container { text-align: center; }
-        .login-button { display: inline-block; background-color: #4285F4; color: white; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px 0 rgba(0,0,0,0.25); }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f7f7f7;
+        }
+        .login-container {
+            text-align: center;
+            background: white;
+            padding: 2em 3em;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-button {
+            display: block; /* Make buttons take full width */
+            width: 100%;
+            box-sizing: border-box; /* Include padding in width */
+            padding: 12px 24px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 1em;
+            border: 1px solid transparent;
+        }
+        .primary {
+            background-color: #4285F4;
+            color: white;
+        }
+        .secondary {
+            background-color: #f8f9fa;
+            color: #343a40;
+            border-color: #dee2e6;
+        }
+        .separator {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #6c757d;
+            margin: 1em 0;
+        }
+        .separator::before, .separator::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .separator:not(:empty)::before {
+            margin-right: .5em;
+        }
+        .separator:not(:empty)::after {
+            margin-left: .5em;
+        }
+        .signup-link {
+            margin-top: 1.5em;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .signup-link a {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="login-container">
         <h1>Welcome!</h1>
-        <p>Please log in to continue.</p>
-        <a href="{% provider_login_url 'google' %}?next=/auth/success/" class="login-button">Sign In with Google</a>
+        <p>Sign in or create an account to continue.</p>
+
+        <!-- Google Login Button (Primary) -->
+        <a href="{% provider_login_url 'google' %}?next=/auth/success/" class="login-button primary">Sign In with Google</a>
+
+        <div class="separator">OR</div>
+
+        <!-- Email/Password Login Button (Secondary) -->
+        <a href="{% url 'account_login' %}" class="login-button secondary">Sign In with Email</a>
+
+        <!-- Link to Sign Up Page -->
+        <div class="signup-link">
+            Don't have an account? <a href="{% url 'account_signup' %}">Create one</a>
+        </div>
     </div>
 </body>
 </html>

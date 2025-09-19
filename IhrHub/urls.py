@@ -8,7 +8,7 @@ from rest_framework_simplejwt.views import (
 )
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-from myapi.views import GoogleLogin, auth_success, login_page
+from myapi.views import GoogleLogin, auth_success, login_page, EmailVerificationRedirectView
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -29,6 +29,7 @@ urlpatterns = [
     path('api/', include('myapi.urls')),
     path('accounts/', include('allauth.urls')),
     path('api/auth/google/', GoogleLogin.as_view(), name='google_api_login'),
+    path('verify-email-redirect/', EmailVerificationRedirectView.as_view(), name='verify_email_redirect'),
 
     path('api/chat/', include('apps.chat.urls')),
 
