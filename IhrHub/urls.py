@@ -2,13 +2,13 @@ from django.contrib import admin
 from django.urls import path, include, re_path  # <-- add re_path here
 from rest_framework import permissions
 from .views import custom_swagger_ui
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+# from rest_framework_simplejwt.views import (
+#     TokenObtainPairView,
+#     TokenRefreshView,
+# )
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-from myapi.views import GoogleLogin, auth_success, login_page, EmailVerificationRedirectView
+# from myapi.views import GoogleLogin, auth_success, login_page, EmailVerificationRedirectView
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -22,22 +22,22 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    path('', login_page, name='login_page'),
+    # path('', login_page, name='login_page'),
     path('admin/', admin.site.urls),
-    path('api/auth/', include('dj_rest_auth.urls')),
-    path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
-    path('api/', include('myapi.urls')),
-    path('accounts/', include('allauth.urls')),
-    path('api/auth/google/', GoogleLogin.as_view(), name='google_api_login'),
-    path('verify-email-redirect/', EmailVerificationRedirectView.as_view(), name='verify_email_redirect'),
+    # path('api/auth/', include('dj_rest_auth.urls')),
+    # path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
+    # path('api/', include('myapi.urls')),
+    # path('accounts/', include('allauth.urls')),
+    # path('api/auth/google/', GoogleLogin.as_view(), name='google_api_login'),
+    # path('verify-email-redirect/', EmailVerificationRedirectView.as_view(), name='verify_email_redirect'),
 
-    path('api/chat/', include('apps.chat.urls')),
+    # path('api/chat/', include('apps.chat.urls')),
 
-    path('auth/success/', auth_success, name='auth_success'),
+    # path('auth/success/', auth_success, name='auth_success'),
 
     # JWT Auth endpoints
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    # path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # Swagger JSON schema endpoint - must be before swagger UI to avoid 404
     re_path(r'^swagger\.json$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
@@ -53,4 +53,8 @@ urlpatterns = [
     path('api/support/', include('support.urls')),
     path('api/project/', include('project.urls')),
     # path('api/auth/', include('accounts.urls')),
+
+
+    # Login and Registration routes
+    path('myapi/', include('myapi.urls')),
 ]
