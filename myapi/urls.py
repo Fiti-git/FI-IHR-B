@@ -1,11 +1,3 @@
-# # myapi/urls.py
-# from django.urls import path
-# from .views import ProtectedView
-
-# urlpatterns = [
-#     path('protected/', ProtectedView.as_view(), name='protected'),
-# ]
-
 from django.urls import path
 from .views import SignUpView, SignInView, GoogleLoginView ,google_oauth_callback,linkedin_oauth_callback
 
