@@ -1,104 +1,15 @@
-# # myapi/views.py
-
-# from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-# from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-# from dj_rest_auth.registration.views import SocialLoginView
-# from rest_framework.views import APIView
-# from rest_framework.response import Response
-# from rest_framework.permissions import IsAuthenticated
-# from django.shortcuts import render
-# from django.contrib.auth.decorators import login_required
-# from rest_framework_simplejwt.tokens import RefreshToken
-# from django.views.generic import RedirectView
-
-# class EmailVerificationRedirectView(RedirectView):
-#     def get_redirect_url(self, *args, **kwargs):
-#         # Customize this URL to your frontend's success page
-#         return "http://127.0.0.1:8000/email-verified-successfully"
-
-# # The existing ProtectedView from the previous guide
-# class ProtectedView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def get(self, request):
-#         content = {'message': f'Hello, {request.user.email}! You are seeing a protected view.'}
-#         return Response(content)
-
-
-# # THIS IS THE NEW VIEW
-# class GoogleLogin(SocialLoginView):
-#     adapter_class = GoogleOAuth2Adapter
-#     # callback_url = "http://127.0.0.1:8000/api/auth/google/"
-#     client_class = OAuth2Client
-#     callback_url = "http://localhost:3000"
-    
-
-#     # ADD THIS METHOD TO DEBUG
-#     def post(self, request, *args, **kwargs):
-#         # --- START DIAGNOSTIC ---
-#         from allauth.socialaccount.models import SocialApp
-#         from django.contrib.sites.models import Site
-
-#         print("--- Inside GoogleLogin View ---")
-#         try:
-#             # Check what SITE_ID Django is currently using
-#             current_site = Site.objects.get_current()
-#             print(f"Current Site from get_current(): {current_site.name} (ID: {current_site.id})")
-
-#             # Try to fetch the SocialApp exactly how allauth would
-#             app = SocialApp.objects.get(provider='google', sites=current_site)
-#             print(f"Successfully fetched SocialApp: {app.name}")
-#             print(f"   - Client ID starts with: {app.client_id[:5]}...")
-#             print(f"   - Linked to sites: {[site.name for site in app.sites.all()]}")
-
-#         except Site.DoesNotExist:
-#             print("ERROR: Could not find a current Site. Is SITE_ID correct?")
-#         except SocialApp.DoesNotExist:
-#             print("ERROR: SocialApp.objects.get query FAILED. This is the root cause.")
-#             print("       - Provider being queried: 'google'")
-#             print(f"      - Site being queried: {current_site.name}")
-
-#         print("--- End Diagnostic ---")
-        
-#         # Continue with the normal login process
-#         return super().post(request, *args, **kwargs)
-
-# @login_required
-# def auth_success(request):
-#     """
-#     A view that the user is redirected to after a successful login.
-#     It generates JWTs and passes them to the template.
-#     """
-#     # The user is available at request.user
-#     user = request.user
-
-#     # Generate JWT tokens for the user
-#     refresh = RefreshToken.for_user(user)
-#     access_token = str(refresh.access_token)
-#     refresh_token = str(refresh)
-
-#     # Prepare the context to pass to the template
-#     context = {
-#         'user': user,
-#         'access_token': access_token,
-#         'refresh_token': refresh_token,
-#     }
-
-#     # Render the success page template
-#     return render(request, 'auth_success.html', context)
-
-# def login_page(request):
-#     """
-#     A simple page that provides a link to log in with Google.
-#     """
-#     return render(request, 'login_page.html')
+from django.core.mail import send_mail
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.template.loader import render_to_string
+from .utils import account_activation_token
 
 
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth.models import User
+from rest_framework import status, permissions
+from django.contrib.auth.models import User, Group
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from google.oauth2 import id_token
@@ -121,244 +32,267 @@ def get_tokens_for_user(user):
 
 class SignUpView(APIView):
     """
-    View to handle user registration (sign-up) with email and password.
+    Handles new user registration.
+    Creates an inactive user and sends a verification email.
+    Does NOT return login tokens.
     """
     def post(self, request):
-        data = request.data
-        email = data.get('email')
-        password = data.get('password')
-        name = data.get('name', '')
+        email = request.data.get('email')
+        password = request.data.get('password')
+        name = request.data.get('name', '')
 
         if not email or not password:
-            return Response({'error': 'Email and password are required'}, status=400)
+            return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check if the email is already in use
         if User.objects.filter(username=email).exists():
-            return Response({'error': 'User already exists'}, status=400)
+            return Response({'error': 'A user with this email already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create the new user
+        # Create the user but as inactive
         user = User.objects.create_user(
             username=email,
             email=email,
             password=password,
             first_name=name
         )
+        
+        ## CHANGE: Set the user to inactive until they verify their email.
+        user.is_active = False
+        user.save()
 
-        # Generate JWT tokens
-        tokens = get_tokens_for_user(user)
+        ## CHANGE: Send the verification email.
+        send_verification_email(user, request) # Assumes this function is in your myapi/views.py or myapi/utils.py
 
-        return Response({'message': 'User created', 'tokens': tokens}, status=201)
+        ## CHANGE: Do NOT generate or return tokens.
+        ## Instead, return a success message instructing the user to check their email.
+        return Response(
+            {"message": "Registration successful. Please check your email to verify your account."},
+            status=status.HTTP_201_CREATED
+        )
 
+#====================================================================
+# 2. Refactored SignInView
+#====================================================================
 class SignInView(APIView):
     """
-    View to handle user login (sign-in) with email and password.
+    Handles user login.
+    Checks if the user is active (verified) and returns their role.
     """
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
 
         if not email or not password:
-            return Response({'error': 'Email and password are required'}, status=400)
+            return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Authenticate the user
         user = authenticate(username=email, password=password)
         
         if user:
-            # Generate JWT tokens
+            ## CHANGE: Check if the user has verified their email.
+            if not user.is_active:
+                return Response({'error': 'Please verify your email before logging in.'}, status=status.HTTP_403_FORBIDDEN)
+            
             tokens = get_tokens_for_user(user)
-            return Response({'tokens': tokens})
-        else:
-            return Response({'error': 'Invalid credentials'}, status=401)
+            
+            ## CHANGE: Get the user's role from their group assignment.
+            user_groups = user.groups.values_list('name', flat=True)
+            role = user_groups[0].lower() if user_groups else None # e.g., 'employer' or null
 
+            ## CHANGE: Return the user's role along with the tokens.
+            return Response({
+                'tokens': tokens,
+                'user': {'role': role}
+            })
+        else:
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+#====================================================================
+# 3. Refactored GoogleLoginView
+#====================================================================
 class GoogleLoginView(APIView):
     """
-    View to handle Google OAuth login using an ID token.
+    Handles Google OAuth login.
+    Email is considered pre-verified by Google. The user is set to active.
+    Returns the user's role so the frontend can decide to redirect to the dashboard or to role selection.
     """
     def post(self, request):
         token = request.data.get("token")
-        
         if not token:
-            return Response({"error": "Token not provided"}, status=400)
+            return Response({"error": "Token not provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Replace with your actual Google CLIENT_ID
             CLIENT_ID = "858134682989-mav50sd3csolb7u8tbc1susrhm5uvk49.apps.googleusercontent.com"
-            
-            # Verify the Google ID token
             idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), CLIENT_ID)
-
             email = idinfo["email"]
             name = idinfo.get("name", "")
 
-            # Get or create the user
+            ## CHANGE: Use get_or_create and ensure the user is active.
             user, created = User.objects.get_or_create(username=email, defaults={
                 "email": email,
                 "first_name": name,
+                "is_active": True, # Social login emails are considered verified.
             })
+            
+            # If an existing user was inactive, activate them.
+            if not created and not user.is_active:
+                user.is_active = True
+                user.save()
 
-            # Generate JWT tokens
             tokens = get_tokens_for_user(user)
 
-            return Response({'tokens': tokens})
+            ## CHANGE: Get and return the user's role, same as in SignInView.
+            user_groups = user.groups.values_list('name', flat=True)
+            role = user_groups[0].lower() if user_groups else None
 
+            return Response({
+                'tokens': tokens,
+                'user': {'role': role}
+            })
         except ValueError:
-            return Response({"error": "Invalid token"}, status=401)
+            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
-            return Response({"error": str(e)}, status=400)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+#====================================================================
+# 4. Refactored LinkedIn Callback
+# NOTE: This should be a DRF APIView for consistency.
+#====================================================================
+class LinkedInLoginView(APIView):
+    """
+    Handles the LinkedIn OAuth callback.
+    Similar logic to Google: creates an active user and returns their role.
+    """
+    def post(self, request):
+        code = request.data.get('code')
+        if not code:
+            return Response({"error": "Missing authorization code"}, status=status.HTTP_400_BAD_REQUEST)
 
-def google_oauth_callback(request):
-    code = request.GET.get("code")
-    if not code:
-        return JsonResponse({"error": "Missing code"}, status=400)
+        # Step 1: Exchange code for access token
+        token_response = requests.post("https://www.linkedin.com/oauth/v2/accessToken", data={
+            'grant_type': 'authorization_code', 'code': code,
+            'redirect_uri': settings.LINKEDIN_REDIRECT_URI,
+            'client_id': settings.LINKEDIN_CLIENT_ID,
+            'client_secret': settings.LINKEDIN_CLIENT_SECRET,
+        })
+        token_data = token_response.json()
+        access_token = token_data.get('access_token')
 
-    token_url = "https://oauth2.googleapis.com/token"
-    data = {
-        "code": code,
-        "client_id": settings.GOOGLE_CLIENT_ID,
-        "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        "redirect_uri": "http://localhost:8000/api/google-oauth-callback/",
-        "grant_type": "authorization_code",
-    }
+        if not access_token:
+            return Response({"error": "Failed to retrieve access token from LinkedIn"}, status=status.HTTP_400_BAD_REQUEST)
 
-    token_res = requests.post(token_url, data=data)
-    token_data = token_res.json()
-
-    if "error" in token_data:
-        return JsonResponse({"error": token_data.get("error_description")}, status=400)
-
-    id_token = token_data.get("id_token")
-    access_token = token_data.get("access_token")
-
-    # Optionally decode and verify ID token to get user info
-    userinfo_res = requests.get(
-        "https://www.googleapis.com/oauth2/v3/userinfo",
-        headers={"Authorization": f"Bearer {access_token}"}
-    )
-    userinfo = userinfo_res.json()
-
-    # Here you’d create or log in the user in Django
-    # Example:
-    # user = get_or_create_user(userinfo["email"], userinfo["name"], ...)
-
-    return JsonResponse({
-        "id_token": id_token,
-        "access_token": access_token,
-        "user": userinfo
-    })
-
-def linkedin_oauth_callback(request):
-    code = request.GET.get('code')
-    if not code:
-        return JsonResponse({"error": "Missing authorization code"}, status=400)
-
-    token_url = "https://www.linkedin.com/oauth/v2/accessToken"
-    data = {
-        'grant_type': 'authorization_code',
-        'code': code,
-        'redirect_uri': settings.LINKEDIN_REDIRECT_URI,
-        'client_id': settings.LINKEDIN_CLIENT_ID,
-        'client_secret': settings.LINKEDIN_CLIENT_SECRET,
-    }
-
-    token_response = requests.post(token_url, data=data)
-    token_json = token_response.json()
-
-    access_token = token_json.get('access_token')
-    id_token = token_json.get('id_token')
-
-    if not access_token or not id_token:
-        return JsonResponse({"error": "Failed to get tokens"}, status=400)
-
-    # Decode id_token to get user info (don't skip validation in production)
-    try:
-        decoded = jwt.decode(id_token, options={"verify_signature": False})  # TODO: verify signature with JWKS
-        email = decoded.get('email')
-        first_name = decoded.get('given_name', '')
-        last_name = decoded.get('family_name', '')
-        full_name = decoded.get('name', '').strip()
-    except Exception as e:
-        return JsonResponse({"error": f"Failed to decode ID token: {str(e)}"}, status=400)
-
-    if not email:
-        return JsonResponse({"error": "Email not provided in ID token"}, status=400)
-
-    # Create or get user
-    user, created = User.objects.get_or_create(username=email, defaults={
-        'email': email,
-        'first_name': first_name,
-        'last_name': last_name,
-    })
-
-    tokens = get_tokens_for_user(user)
-
-    return JsonResponse({
-        'tokens': tokens,
-        'user': {
+        # Step 2: Use access token to get user's profile info (including email)
+        profile_response = requests.get("https://api.linkedin.com/v2/userinfo", headers={
+            "Authorization": f"Bearer {access_token}"
+        })
+        profile_data = profile_response.json()
+        email = profile_data.get('email')
+        
+        if not email:
+            return Response({"error": "Could not retrieve email from LinkedIn"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Step 3: Get or create the user in your database
+        user, created = User.objects.get_or_create(username=email, defaults={
             'email': email,
-            'first_name': first_name,
-            'last_name': last_name,
-            'full_name': full_name,
-        }
-    })
-    code = request.GET.get('code')
-    if not code:
-        return JsonResponse({"error": "Missing authorization code"}, status=400)
+            'first_name': profile_data.get('given_name', ''),
+            'last_name': profile_data.get('family_name', ''),
+            'is_active': True,
+        })
 
-    # Step 1: Exchange authorization code for access token
-    token_url = "https://www.linkedin.com/oauth/v2/accessToken"
-    data = {
-        'grant_type': 'authorization_code',
-        'code': code,
-        'redirect_uri': settings.LINKEDIN_REDIRECT_URI,  # your callback URL
-        'client_id': settings.LINKEDIN_CLIENT_ID,
-        'client_secret': settings.LINKEDIN_CLIENT_SECRET,
-    }
+        if not created and not user.is_active:
+            user.is_active = True
+            user.save()
 
-    token_response = requests.post(token_url, data=data)
-    token_json = token_response.json()
+        # Step 4: Generate tokens and return role
+        tokens = get_tokens_for_user(user)
+        user_groups = user.groups.values_list('name', flat=True)
+        role = user_groups[0].lower() if user_groups else None
 
-    access_token = token_json.get('access_token')
-    if not access_token:
-        return JsonResponse({"error": "Failed to get access token"}, status=400)
+        return Response({
+            'tokens': tokens,
+            'user': {'role': role}
+        })
 
-    # Step 2: Use access token to get user profile data
-    profile_url = "https://api.linkedin.com/v2/me"
-    email_url = "https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))"
+def send_verification_email(user, request):
+    """
+    Sends the verification email using the configured Django email backend,
+    which is now Anymail + Mailgun.
+    """
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = account_activation_token.make_token(user)
     
-    headers = {'Authorization': f'Bearer {access_token}'}
+    # Construct the verification link that points to your BACKEND API
+    # The frontend will handle the final redirect after a successful API call.
+    verification_url = f"http://localhost:8000/myapi/verify-email/{uid}/{token}/"
+    
+    subject = "Verify your email for HRHUB"
+    
+    # Simple text-based email body
+    message = f"""
+Hi {user.username},
 
-    profile_response = requests.get(profile_url, headers=headers)
-    profile_data = profile_response.json()
+Thank you for registering with HRHUB!
 
-    email_response = requests.get(email_url, headers=headers)
-    email_data = email_response.json()
+Please click the link below to verify your email and activate your account:
+{verification_url}
 
-    # Extract user's email and name
-    try:
-        email = email_data['elements'][0]['handle~']['emailAddress']
-        first_name = profile_data.get('localizedFirstName', '')
-        last_name = profile_data.get('localizedLastName', '')
-        full_name = f"{first_name} {last_name}".strip()
-    except (KeyError, IndexError):
-        return JsonResponse({"error": "Failed to retrieve user info from LinkedIn"}, status=400)
+If you did not sign up for an account, you can safely ignore this email.
 
-    # Step 3: Get or create the Django user
-    user, created = User.objects.get_or_create(username=email, defaults={
-        'email': email,
-        'first_name': first_name,
-        'last_name': last_name,
-    })
+Thanks,
+The HRHUB Team
+"""
+    # This send_mail function now sends through Mailgun automatically!
+    # It uses the DEFAULT_FROM_EMAIL from settings.py
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL, # from_email
+        [user.email],               # recipient_list
+        fail_silently=False,
+    )
 
-    # Step 4: Generate JWT tokens for the user
-    tokens = get_tokens_for_user(user)
+class VerifyEmailView(APIView):
+    def get(self, request, uidb64, token):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
 
-    return JsonResponse({
-        'tokens': tokens,
-        'user': {
-            'email': email,
-            'first_name': first_name,
-            'last_name': last_name,
-            'full_name': full_name,
-        }
-    })
+        if user is not None and account_activation_token.check_token(user, token):
+            user.is_active = True
+            user.save()
+            # SUCCESS: Redirect to the frontend login page with a success flag
+            frontend_url = 'http://localhost:3000/login?verified=true'
+            return HttpResponseRedirect(frontend_url)
+        else:
+            # FAILURE: Redirect to a frontend error page or the register page
+            frontend_url = 'http://localhost:3000/register?error=invalid_link'
+            return HttpResponseRedirect(frontend_url)
+
+
+# --- 2. ROLE SELECTION ---
+
+class SetRoleView(APIView):
+    """
+    A protected view for a newly verified user to set their role.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        role_name = request.data.get("role") # Expects "employer" or "employee"
+
+        # Prevent users from changing their role
+        if user.groups.exists():
+            return Response({"error": "Role has already been set and cannot be changed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if role_name not in ["employer", "employee"]:
+            return Response({"error": "Invalid role specified."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Capitalize to match the Group name
+        group_name = role_name.capitalize()
+        try:
+            group = Group.objects.get(name=group_name)
+            user.groups.add(group)
+            return Response({"message": f"Role successfully set as {group_name}."}, status=status.HTTP_200_OK)
+        except Group.DoesNotExist:
+            return Response({"error": f"The '{group_name}' role does not exist on the server."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
