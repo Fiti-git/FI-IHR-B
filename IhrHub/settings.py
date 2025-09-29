@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     'project',
     'myapi',
     'apps.chat',
-    'user', 
+    'user',
+    'jobs',  # Added jobs app
 ]
 
 
@@ -112,7 +113,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'IHRDB',
         'USER': 'postgres',
-        'PASSWORD': 'postgres',
+        'PASSWORD': 'admin123',
         'HOST': 'localhost',
         'PORT': '5432',
     }
