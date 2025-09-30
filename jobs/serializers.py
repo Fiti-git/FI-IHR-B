@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import JobPosting, JobApplication, JobInterview
+from .models import JobPosting, JobApplication, JobInterview, JobOffer
 
 
 class JobPostingSerializer(serializers.ModelSerializer):
@@ -234,4 +234,93 @@ class JobInterviewListSerializer(serializers.ModelSerializer):
         model = JobInterview
         fields = [
             'id', 'application_id', 'interview_date', 'interview_mode', 'status'
+        ]
+
+
+class JobOfferSerializer(serializers.ModelSerializer):
+    """
+    Serializer for JobOffer model
+    """
+    application_id = serializers.IntegerField(write_only=True, help_text="Foreign key to job_application.id")
+    
+    class Meta:
+        model = JobOffer
+        fields = [
+            'id', 'application_id', 'offer_status', 'offer_details',
+            'date_offered', 'date_accepted', 'date_rejected'
+        ]
+        read_only_fields = ['date_offered']
+    
+    def create(self, validated_data):
+        """
+        Create a new job offer
+        """
+        application_id = validated_data.pop('application_id')
+        application = JobApplication.objects.get(id=application_id)
+        validated_data['application'] = application
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        """
+        Update a job offer
+        """
+        if 'application_id' in validated_data:
+            application_id = validated_data.pop('application_id')
+            application = JobApplication.objects.get(id=application_id)
+            validated_data['application'] = application
+        
+        # Auto-set date_accepted or date_rejected based on status change
+        new_status = validated_data.get('offer_status')
+        if new_status and new_status != instance.offer_status:
+            if new_status == 'Accepted' and not instance.date_accepted:
+                validated_data['date_accepted'] = timezone.now()
+                validated_data['date_rejected'] = None
+            elif new_status == 'Rejected' and not instance.date_rejected:
+                validated_data['date_rejected'] = timezone.now()
+                validated_data['date_accepted'] = None
+            elif new_status == 'Pending':
+                validated_data['date_accepted'] = None
+                validated_data['date_rejected'] = None
+        
+        return super().update(instance, validated_data)
+    
+    def to_representation(self, instance):
+        """
+        Customize the output representation to include application_id
+        """
+        representation = super().to_representation(instance)
+        representation['application_id'] = instance.application.id
+        return representation
+    
+    def validate(self, data):
+        """
+        Validate job offer data
+        """
+        # Validate that the application exists
+        application_id = data.get('application_id')
+        if application_id and not JobApplication.objects.filter(id=application_id).exists():
+            raise serializers.ValidationError(
+                "Job application with this ID does not exist."
+            )
+        
+        # Validate that offer_details is provided
+        offer_details = data.get('offer_details')
+        if not offer_details or not offer_details.strip():
+            raise serializers.ValidationError(
+                "Offer details are required and cannot be empty."
+            )
+        
+        return data
+
+
+class JobOfferListSerializer(serializers.ModelSerializer):
+    """
+    Simplified serializer for listing job offers
+    """
+    application_id = serializers.IntegerField(source='application.id', read_only=True)
+    
+    class Meta:
+        model = JobOffer
+        fields = [
+            'id', 'application_id', 'offer_status', 'date_offered'
         ]

@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.db import models
-from .models import JobPosting, JobApplication, JobInterview
-from .serializers import JobPostingSerializer, JobApplicationSerializer, JobInterviewSerializer
+from .models import JobPosting, JobApplication, JobInterview, JobOffer
+from .serializers import JobPostingSerializer, JobApplicationSerializer, JobInterviewSerializer, JobOfferSerializer
 
 
 class JobPostingViewSet(viewsets.ModelViewSet):
@@ -399,4 +399,116 @@ class JobInterviewViewSet(viewsets.ModelViewSet):
         
         return Response({
             "message": "Job interview deleted"
+        }, status=status.HTTP_200_OK)
+
+
+class JobOfferViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for JobOffer model - provides CRUD operations for job offers
+    """
+    queryset = JobOffer.objects.all()
+    serializer_class = JobOfferSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """
+        POST /api/job-offer/
+        Create a new job offer
+        """
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            offer = serializer.save()
+            return Response({
+                "offer_id": offer.id,
+                "message": "Job offer created successfully"
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        GET /api/job-offer/{id}/
+        Fetch a specific job offer by its ID
+        """
+        instance = self.get_object()
+        
+        response_data = {
+            "offer_id": instance.id,
+            "application_id": instance.application.id,
+            "offer_status": instance.offer_status,
+            "offer_details": instance.offer_details,
+            "date_offered": instance.date_offered.strftime('%Y-%m-%d %H:%M:%S'),
+            "date_accepted": instance.date_accepted.strftime('%Y-%m-%d %H:%M:%S') if instance.date_accepted else None,
+            "date_rejected": instance.date_rejected.strftime('%Y-%m-%d %H:%M:%S') if instance.date_rejected else None
+        }
+        
+        return Response(response_data)
+    
+    def list(self, request, *args, **kwargs):
+        """
+        GET /api/job-offer/
+        Fetch a list of all job offers with optional filtering
+        """
+        queryset = self.get_queryset()
+        
+        # Apply filters based on query parameters
+        application_id = request.query_params.get('application_id')
+        if application_id:
+            queryset = queryset.filter(application_id=application_id)
+        
+        freelancer_id = request.query_params.get('freelancer_id')
+        if freelancer_id:
+            queryset = queryset.filter(application__freelancer_id=freelancer_id)
+        
+        status_filter = request.query_params.get('offer_status')
+        if status_filter:
+            queryset = queryset.filter(offer_status__iexact=status_filter)
+        
+        # Format response data
+        offers_list = []
+        for offer in queryset:
+            offers_list.append({
+                "offer_id": offer.id,
+                "application_id": offer.application.id,
+                "offer_status": offer.offer_status,
+                "date_offered": offer.date_offered.strftime('%Y-%m-%d %H:%M')
+            })
+        
+        return Response({
+            "offers": offers_list
+        })
+    
+    def update(self, request, *args, **kwargs):
+        """
+        PUT /api/job-offer/{id}/
+        Update an existing job offer
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Job offer updated"
+            })
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """
+        PATCH /api/job-offer/{id}/
+        Partially update an existing job offer
+        """
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        DELETE /api/job-offer/{id}/
+        Delete a job offer by its ID
+        """
+        instance = self.get_object()
+        instance.delete()
+        
+        return Response({
+            "message": "Job offer deleted"
         }, status=status.HTTP_200_OK)
