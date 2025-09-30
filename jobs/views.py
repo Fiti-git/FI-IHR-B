@@ -1,8 +1,15 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from django.db import models
+from django.shortcuts import get_object_or_404
 from .models import JobPosting, JobApplication, JobInterview, JobOffer, ApplicationWithdrawal
-from .serializers import JobPostingSerializer, JobPostingCreateSerializer, JobApplicationSerializer, JobInterviewSerializer, JobOfferSerializer, ApplicationWithdrawalSerializer
+from .serializers import (
+    JobPostingSerializer, JobPostingCreateSerializer, JobApplicationSerializer, 
+    JobApplicationCreateSerializer, JobApplicationJobListSerializer, 
+    JobApplicationReviewSerializer, JobApplicationUpdateSerializer,
+    JobInterviewSerializer, JobOfferSerializer, ApplicationWithdrawalSerializer
+)
 
 
 class JobPostingViewSet(viewsets.ModelViewSet):
@@ -172,6 +179,22 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
     """
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationSerializer
+    lookup_field = 'id'
+    lookup_url_kwarg = 'job_id'
+    
+    def get_serializer_class(self):
+        """
+        Return the appropriate serializer class based on the action
+        """
+        if self.action == 'create':
+            return JobApplicationCreateSerializer
+        elif self.action == 'get_applications_for_job':
+            return JobApplicationJobListSerializer
+        elif self.action == 'review_application':
+            return JobApplicationReviewSerializer
+        elif self.action == 'update_application_status':
+            return JobApplicationUpdateSerializer
+        return JobApplicationSerializer
     
     def create(self, request, *args, **kwargs):
         """
@@ -185,6 +208,64 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 "application_id": application.id,
                 "message": "Application submitted successfully"
             }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def get_applications_for_job(self, request, job_id=None):
+        """
+        GET /api/job-application/job/{job_id}/
+        Fetch all applications for a specific job
+        """
+        # Get all applications for the specified job
+        applications = JobApplication.objects.filter(job_id=job_id)
+        
+        if not applications.exists():
+            return Response({
+                "applications": []
+            })
+        
+        serializer = self.get_serializer(applications, many=True)
+        return Response({
+            "applications": serializer.data
+        })
+    
+    def review_application(self, request, application_id=None):
+        """
+        POST /api/job-application/review/{application_id}/
+        Review and rate an application
+        """
+        application = get_object_or_404(JobApplication, id=application_id)
+        serializer = self.get_serializer(application, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Application reviewed and rated successfully",
+                "application_id": application.id,
+                "status": application.status,
+                "rating": application.rating,
+                "comments": application.comments
+            })
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def update_application_status(self, request, application_id=None):
+        """
+        PUT /api/job-application/update/{application_id}/
+        Update application status and rating
+        """
+        application = get_object_or_404(JobApplication, id=application_id)
+        serializer = self.get_serializer(application, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Application status and rating updated successfully",
+                "application_id": application.id,
+                "status": application.status,
+                "rating": application.rating,
+                "comments": application.comments
+            })
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     

@@ -183,16 +183,32 @@ class JobApplication(models.Model):
             ('Pending', 'Pending'),
             ('Accepted', 'Accepted'),
             ('Rejected', 'Rejected'),
+            ('Save for Later', 'Save for Later'),
             ('Withdrawn', 'Withdrawn'),
         ],
         default='Pending',
-        help_text="Application status (Pending, Accepted, Rejected, Withdrawn)"
+        help_text="Application status (Pending, Accepted, Rejected, Save for Later, Withdrawn)"
     )
     
     # Column 8: date_applied
     date_applied = models.DateTimeField(
         auto_now_add=True,
         help_text="Date the freelancer applied"
+    )
+    
+    # Additional fields for rating and comments
+    rating = models.DecimalField(
+        max_digits=2,
+        decimal_places=1,
+        blank=True,
+        null=True,
+        help_text="Rating from 1 to 5"
+    )
+    
+    comments = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Comments from employer review"
     )
     
     class Meta:

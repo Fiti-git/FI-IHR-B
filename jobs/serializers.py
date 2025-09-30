@@ -164,7 +164,7 @@ class JobApplicationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = JobApplication
-        fields = ['id', 'job_id', 'freelancer_id', 'resume', 'cover_letter', 'expected_rate', 'status', 'date_applied']
+        fields = ['id', 'job_id', 'freelancer_id', 'resume', 'cover_letter', 'expected_rate', 'status', 'date_applied', 'rating', 'comments']
         read_only_fields = ['date_applied']
     
     def create(self, validated_data):
@@ -234,6 +234,134 @@ class JobApplicationListSerializer(serializers.ModelSerializer):
             'id', 'job_id', 'freelancer_id', 'status', 
             'expected_rate', 'date_applied'
         ]
+
+
+class JobApplicationCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating job applications - simplified request
+    """
+    job_id = serializers.IntegerField(write_only=True, help_text="Foreign key to job_posting.id")
+    
+    class Meta:
+        model = JobApplication
+        fields = ['job_id', 'freelancer_id', 'resume', 'cover_letter']
+    
+    def create(self, validated_data):
+        """
+        Create a new job application
+        """
+        job_id = validated_data.pop('job_id')
+        job = JobPosting.objects.get(id=job_id)
+        validated_data['job'] = job
+        return super().create(validated_data)
+    
+    def validate(self, data):
+        """
+        Validate job application data
+        """
+        # Validate that resume URL is provided
+        resume = data.get('resume')
+        if not resume:
+            raise serializers.ValidationError(
+                "Resume URL is required."
+            )
+        
+        # Validate that the job exists
+        job_id = data.get('job_id')
+        if job_id and not JobPosting.objects.filter(id=job_id).exists():
+            raise serializers.ValidationError(
+                "Job posting with this ID does not exist."
+            )
+        
+        return data
+
+
+class JobApplicationJobListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for listing applications for a specific job with freelancer details
+    """
+    freelancer_name = serializers.CharField(default="Unknown", help_text="Freelancer name (placeholder)")
+    resume_url = serializers.URLField(source='resume', help_text="URL to resume")
+    cover_letter_url = serializers.URLField(source='cover_letter', help_text="URL to cover letter")
+    
+    class Meta:
+        model = JobApplication
+        fields = [
+            'id', 'freelancer_name', 'resume_url', 'cover_letter_url', 
+            'status', 'rating', 'comments'
+        ]
+    
+    def to_representation(self, instance):
+        """
+        Customize the output representation
+        """
+        representation = super().to_representation(instance)
+        representation['application_id'] = instance.id
+        # Remove the 'id' field since we're using 'application_id'
+        representation.pop('id', None)
+        return representation
+
+
+class JobApplicationReviewSerializer(serializers.ModelSerializer):
+    """
+    Serializer for reviewing and rating job applications
+    """
+    
+    class Meta:
+        model = JobApplication
+        fields = ['rating', 'status', 'comments']
+    
+    def validate_rating(self, value):
+        """
+        Validate rating is between 1 and 5
+        """
+        if value is not None and (value < 1 or value > 5):
+            raise serializers.ValidationError(
+                "Rating must be between 1 and 5."
+            )
+        return value
+    
+    def validate_status(self, value):
+        """
+        Validate status is one of the allowed choices
+        """
+        allowed_statuses = ['Pending', 'Accepted', 'Rejected', 'Save for Later']
+        if value not in allowed_statuses:
+            raise serializers.ValidationError(
+                f"Status must be one of: {', '.join(allowed_statuses)}"
+            )
+        return value
+
+
+class JobApplicationUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for updating job application status and rating
+    """
+    
+    class Meta:
+        model = JobApplication
+        fields = ['status', 'rating', 'comments']
+    
+    def validate_rating(self, value):
+        """
+        Validate rating is between 1 and 5
+        """
+        if value is not None and (value < 1 or value > 5):
+            raise serializers.ValidationError(
+                "Rating must be between 1 and 5."
+            )
+        return value
+    
+    def validate_status(self, value):
+        """
+        Validate status is one of the allowed choices
+        """
+        allowed_statuses = ['Pending', 'Accepted', 'Rejected', 'Save for Later']
+        if value not in allowed_statuses:
+            raise serializers.ValidationError(
+                f"Status must be one of: {', '.join(allowed_statuses)}"
+            )
+        return value
 
 
 class JobInterviewSerializer(serializers.ModelSerializer):
