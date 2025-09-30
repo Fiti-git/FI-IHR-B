@@ -54,6 +54,7 @@ urlpatterns = [
     path('api/project/', include('project.urls')),
     path('api/job-posting/', include('jobs.urls')),  # Job posting endpoints
     path('api/job-application/', include('jobs.application_urls')),  # Job application endpoints
+    path('api/job-interview/', include('jobs.interview_urls')),  # Job interview endpoints
     # path('api/auth/', include('accounts.urls')),
 
 

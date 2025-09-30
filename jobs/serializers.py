@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import JobPosting, JobApplication
+from .models import JobPosting, JobApplication, JobInterview
 
 
 class JobPostingSerializer(serializers.ModelSerializer):
@@ -160,4 +160,78 @@ class JobApplicationListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'job_id', 'freelancer_id', 'status', 
             'expected_rate', 'date_applied'
+        ]
+
+
+class JobInterviewSerializer(serializers.ModelSerializer):
+    """
+    Serializer for JobInterview model
+    """
+    application_id = serializers.IntegerField(write_only=True, help_text="Foreign key to job_application.id")
+    
+    class Meta:
+        model = JobInterview
+        fields = [
+            'id', 'application_id', 'interview_date', 'interview_mode', 
+            'status', 'interview_notes'
+        ]
+    
+    def create(self, validated_data):
+        """
+        Create a new job interview
+        """
+        application_id = validated_data.pop('application_id')
+        application = JobApplication.objects.get(id=application_id)
+        validated_data['application'] = application
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        """
+        Update a job interview
+        """
+        if 'application_id' in validated_data:
+            application_id = validated_data.pop('application_id')
+            application = JobApplication.objects.get(id=application_id)
+            validated_data['application'] = application
+        return super().update(instance, validated_data)
+    
+    def to_representation(self, instance):
+        """
+        Customize the output representation to include application_id
+        """
+        representation = super().to_representation(instance)
+        representation['application_id'] = instance.application.id
+        return representation
+    
+    def validate(self, data):
+        """
+        Validate job interview data
+        """
+        # Validate that interview_date is not in the past
+        interview_date = data.get('interview_date')
+        if interview_date and interview_date < timezone.now():
+            raise serializers.ValidationError(
+                "Interview date cannot be in the past."
+            )
+        
+        # Validate that the application exists
+        application_id = data.get('application_id')
+        if application_id and not JobApplication.objects.filter(id=application_id).exists():
+            raise serializers.ValidationError(
+                "Job application with this ID does not exist."
+            )
+        
+        return data
+
+
+class JobInterviewListSerializer(serializers.ModelSerializer):
+    """
+    Simplified serializer for listing job interviews
+    """
+    application_id = serializers.IntegerField(source='application.id', read_only=True)
+    
+    class Meta:
+        model = JobInterview
+        fields = [
+            'id', 'application_id', 'interview_date', 'interview_mode', 'status'
         ]

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import JobPosting, JobApplication
+from .models import JobPosting, JobApplication, JobInterview
 
 
 @admin.register(JobPosting)
@@ -157,3 +157,54 @@ class JobApplicationAdmin(admin.ModelAdmin):
         if obj:  # editing an existing object
             return self.readonly_fields + ['job', 'freelancer_id', 'date_applied']
         return self.readonly_fields
+
+
+@admin.register(JobInterview)
+class JobInterviewAdmin(admin.ModelAdmin):
+    """
+    Admin interface for JobInterview model
+    """
+    list_display = [
+        'id',
+        'application',
+        'interview_date',
+        'interview_mode',
+        'status'
+    ]
+    
+    list_filter = [
+        'status',
+        'interview_mode',
+        'interview_date',
+        'application__job__job_type'
+    ]
+    
+    search_fields = [
+        'application__job__job_title',
+        'application__freelancer_id',
+        'interview_notes'
+    ]
+    
+    readonly_fields = []
+    
+    fieldsets = (
+        ('Interview Information', {
+            'fields': (
+                'application',
+                'interview_date',
+                'interview_mode',
+                'status'
+            )
+        }),
+        ('Interview Details', {
+            'fields': (
+                'interview_notes',
+            )
+        })
+    )
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Make application field readonly when editing"""
+        if obj:  # editing an existing object
+            return ['application']
+        return []

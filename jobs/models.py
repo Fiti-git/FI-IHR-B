@@ -219,3 +219,91 @@ class JobApplication(models.Model):
     def is_rejected(self):
         """Check if the application has been rejected"""
         return self.status == 'Rejected'
+
+
+class JobInterview(models.Model):
+    """
+    Job interview model based on the requirements from job_interview.csv
+    """
+    
+    # Column 2: application_id (Foreign key to job_application.id)
+    application = models.ForeignKey(
+        JobApplication,
+        on_delete=models.CASCADE,
+        related_name='interviews',
+        help_text="Foreign key to job_application.id"
+    )
+    
+    # Column 3: interview_date
+    interview_date = models.DateTimeField(
+        help_text="Scheduled date and time for the interview"
+    )
+    
+    # Column 4: interview_mode
+    interview_mode = models.CharField(
+        max_length=20,
+        choices=[
+            ('in-person', 'In-person'),
+            ('zoom', 'Zoom'),
+            ('phone', 'Phone'),
+            ('teams', 'Microsoft Teams'),
+            ('google-meet', 'Google Meet'),
+        ],
+        help_text="Mode of the interview (In-person, Zoom, etc.)"
+    )
+    
+    # Column 5: status
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('Scheduled', 'Scheduled'),
+            ('Completed', 'Completed'),
+            ('Cancelled', 'Cancelled'),
+            ('Rescheduled', 'Rescheduled'),
+            ('No-show', 'No-show'),
+        ],
+        default='Scheduled',
+        help_text="Interview status (Scheduled, Completed, etc.)"
+    )
+    
+    # Column 6: interview_notes
+    interview_notes = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Notes from the interview"
+    )
+    
+    # Metadata
+    date_created = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Date the interview was scheduled"
+    )
+    
+    date_updated = models.DateTimeField(
+        auto_now=True,
+        help_text="Date the interview was last updated"
+    )
+    
+    class Meta:
+        db_table = 'job_interview'
+        ordering = ['-interview_date']
+        verbose_name = 'Job Interview'
+        verbose_name_plural = 'Job Interviews'
+    
+    def __str__(self):
+        return f"Interview for Application {self.application.id} - {self.interview_date.strftime('%Y-%m-%d %H:%M')}"
+    
+    @property
+    def is_scheduled(self):
+        """Check if the interview is scheduled"""
+        return self.status == 'Scheduled'
+    
+    @property
+    def is_completed(self):
+        """Check if the interview has been completed"""
+        return self.status == 'Completed'
+    
+    @property
+    def is_cancelled(self):
+        """Check if the interview has been cancelled"""
+        return self.status == 'Cancelled'

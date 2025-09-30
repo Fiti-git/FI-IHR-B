@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.db import models
-from .models import JobPosting, JobApplication
-from .serializers import JobPostingSerializer, JobApplicationSerializer
+from .models import JobPosting, JobApplication, JobInterview
+from .serializers import JobPostingSerializer, JobApplicationSerializer, JobInterviewSerializer
 
 
 class JobPostingViewSet(viewsets.ModelViewSet):
@@ -283,4 +283,120 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         
         return Response({
             "message": "Job application deleted"
+        }, status=status.HTTP_200_OK)
+
+
+class JobInterviewViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for JobInterview model - provides CRUD operations for job interviews
+    """
+    queryset = JobInterview.objects.all()
+    serializer_class = JobInterviewSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """
+        POST /api/job-interview/
+        Create a new job interview
+        """
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            interview = serializer.save()
+            return Response({
+                "interview_id": interview.id,
+                "message": "Interview scheduled successfully"
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        GET /api/job-interview/{id}/
+        Fetch a specific job interview by its ID
+        """
+        instance = self.get_object()
+        
+        response_data = {
+            "interview_id": instance.id,
+            "application_id": instance.application.id,
+            "interview_date": instance.interview_date.strftime('%Y-%m-%d %H:%M:%S'),
+            "interview_mode": instance.interview_mode,
+            "status": instance.status,
+            "interview_notes": instance.interview_notes
+        }
+        
+        return Response(response_data)
+    
+    def list(self, request, *args, **kwargs):
+        """
+        GET /api/job-interview/
+        Fetch a list of all job interviews with optional filtering
+        """
+        queryset = self.get_queryset()
+        
+        # Apply filters based on query parameters
+        application_id = request.query_params.get('application_id')
+        if application_id:
+            queryset = queryset.filter(application_id=application_id)
+        
+        freelancer_id = request.query_params.get('freelancer_id')
+        if freelancer_id:
+            queryset = queryset.filter(application__freelancer_id=freelancer_id)
+        
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status__iexact=status_filter)
+        
+        interview_mode = request.query_params.get('interview_mode')
+        if interview_mode:
+            queryset = queryset.filter(interview_mode__iexact=interview_mode)
+        
+        # Format response data
+        interviews_list = []
+        for interview in queryset:
+            interviews_list.append({
+                "interview_id": interview.id,
+                "application_id": interview.application.id,
+                "interview_date": interview.interview_date.strftime('%Y-%m-%d %H:%M'),
+                "interview_mode": interview.interview_mode,
+                "status": interview.status
+            })
+        
+        return Response({
+            "interviews": interviews_list
+        })
+    
+    def update(self, request, *args, **kwargs):
+        """
+        PUT /api/job-interview/{id}/
+        Update an existing job interview
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Job interview updated"
+            })
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """
+        PATCH /api/job-interview/{id}/
+        Partially update an existing job interview
+        """
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        DELETE /api/job-interview/{id}/
+        Delete a job interview by its ID
+        """
+        instance = self.get_object()
+        instance.delete()
+        
+        return Response({
+            "message": "Job interview deleted"
         }, status=status.HTTP_200_OK)
