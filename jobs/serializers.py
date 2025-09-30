@@ -627,17 +627,82 @@ class JobOfferSerializer(serializers.ModelSerializer):
         return data
 
 
-class JobOfferListSerializer(serializers.ModelSerializer):
+class JobOfferCreateSerializer(serializers.ModelSerializer):
     """
-    Simplified serializer for listing job offers
+    Serializer for creating job offers
     """
-    application_id = serializers.IntegerField(source='application.id', read_only=True)
+    application_id = serializers.IntegerField(write_only=True, help_text="Foreign key to job_application.id")
+    offer_details = serializers.JSONField(help_text="Detailed offer structure with salary, start_date, benefits")
     
     class Meta:
         model = JobOffer
-        fields = [
-            'id', 'application_id', 'offer_status', 'date_offered'
-        ]
+        fields = ['application_id', 'offer_details', 'offer_status']
+    
+    def create(self, validated_data):
+        """
+        Create a new job offer
+        """
+        application_id = validated_data.pop('application_id')
+        application = JobApplication.objects.get(id=application_id)
+        validated_data['application'] = application
+        
+        # Convert offer_details dict to string for storage
+        offer_details = validated_data.get('offer_details')
+        if isinstance(offer_details, dict):
+            import json
+            validated_data['offer_details'] = json.dumps(offer_details)
+        
+        return super().create(validated_data)
+    
+    def validate(self, data):
+        """
+        Validate job offer creation data
+        """
+        # Validate that the application exists
+        application_id = data.get('application_id')
+        if application_id and not JobApplication.objects.filter(id=application_id).exists():
+            raise serializers.ValidationError(
+                "Job application with this ID does not exist."
+            )
+        
+        # Validate offer_details structure
+        offer_details = data.get('offer_details')
+        if not offer_details:
+            raise serializers.ValidationError(
+                "Offer details are required."
+            )
+        
+        if isinstance(offer_details, dict):
+            required_fields = ['salary', 'start_date', 'benefits']
+            for field in required_fields:
+                if field not in offer_details:
+                    raise serializers.ValidationError(
+                        f"Offer details must include '{field}' field."
+                    )
+        
+        return data
+
+
+class JobOfferAcceptSerializer(serializers.ModelSerializer):
+    """
+    Serializer for accepting job offers
+    """
+    offer_id = serializers.IntegerField(write_only=True, help_text="Job offer ID")
+    
+    class Meta:
+        model = JobOffer
+        fields = ['offer_id']
+
+
+class JobOfferRejectSerializer(serializers.ModelSerializer):
+    """
+    Serializer for rejecting job offers
+    """
+    offer_id = serializers.IntegerField(write_only=True, help_text="Job offer ID")
+    
+    class Meta:
+        model = JobOffer
+        fields = ['offer_id']
 
 
 class ApplicationWithdrawalSerializer(serializers.ModelSerializer):

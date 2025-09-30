@@ -3,20 +3,21 @@ from .views import JobOfferViewSet
 
 app_name = 'job_offers'
 
-# Standard URL patterns for JobOffer
-job_offer_list = JobOfferViewSet.as_view({
-    'get': 'list',
-    'post': 'create'
+# Custom endpoints only - as specified
+job_offer_create = JobOfferViewSet.as_view({
+    'post': 'create_offer'
 })
 
-job_offer_detail = JobOfferViewSet.as_view({
-    'get': 'retrieve',
-    'put': 'update',
-    'patch': 'partial_update',
-    'delete': 'destroy'
+job_offer_accept = JobOfferViewSet.as_view({
+    'post': 'accept_offer'
+})
+
+job_offer_reject = JobOfferViewSet.as_view({
+    'post': 'reject_offer'
 })
 
 urlpatterns = [
-    path('', job_offer_list, name='job-offer-list'),
-    path('<int:pk>/', job_offer_detail, name='job-offer-detail'),
+    path('create/', job_offer_create, name='job-offer-create'),
+    path('accept/', job_offer_accept, name='job-offer-accept'),
+    path('reject/', job_offer_reject, name='job-offer-reject'),
 ]
