@@ -183,9 +183,10 @@ class JobApplication(models.Model):
             ('Pending', 'Pending'),
             ('Accepted', 'Accepted'),
             ('Rejected', 'Rejected'),
+            ('Withdrawn', 'Withdrawn'),
         ],
         default='Pending',
-        help_text="Application status (Pending, Accepted, Rejected)"
+        help_text="Application status (Pending, Accepted, Rejected, Withdrawn)"
     )
     
     # Column 8: date_applied
@@ -383,3 +384,37 @@ class JobOffer(models.Model):
     def is_rejected(self):
         """Check if the offer has been rejected"""
         return self.offer_status == 'Rejected'
+
+
+class ApplicationWithdrawal(models.Model):
+    """
+    Application withdrawal model based on the requirements from application_withdrawal.csv
+    """
+    
+    # Column 2: application_id (Foreign key to job_application.id)
+    application = models.OneToOneField(
+        JobApplication,
+        on_delete=models.CASCADE,
+        related_name='withdrawal',
+        help_text="Foreign key to job_application.id"
+    )
+    
+    # Column 3: withdrawal_date
+    withdrawal_date = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Date and time of withdrawal"
+    )
+    
+    # Column 4: reason
+    reason = models.TextField(
+        help_text="Reason for withdrawal"
+    )
+    
+    class Meta:
+        db_table = 'application_withdrawal'
+        ordering = ['-withdrawal_date']
+        verbose_name = 'Application Withdrawal'
+        verbose_name_plural = 'Application Withdrawals'
+    
+    def __str__(self):
+        return f"Withdrawal for Application {self.application.id} - {self.withdrawal_date.strftime('%Y-%m-%d')}"

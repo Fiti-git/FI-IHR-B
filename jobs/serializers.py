@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import JobPosting, JobApplication, JobInterview, JobOffer
+from .models import JobPosting, JobApplication, JobInterview, JobOffer, ApplicationWithdrawal
 
 
 class JobPostingSerializer(serializers.ModelSerializer):
@@ -323,4 +323,86 @@ class JobOfferListSerializer(serializers.ModelSerializer):
         model = JobOffer
         fields = [
             'id', 'application_id', 'offer_status', 'date_offered'
+        ]
+
+
+class ApplicationWithdrawalSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ApplicationWithdrawal model
+    """
+    application_id = serializers.IntegerField(write_only=True, help_text="Foreign key to job_application.id")
+    
+    class Meta:
+        model = ApplicationWithdrawal
+        fields = [
+            'id', 'application_id', 'withdrawal_date', 'reason'
+        ]
+        read_only_fields = ['withdrawal_date']
+    
+    def create(self, validated_data):
+        """
+        Create a new application withdrawal
+        """
+        application_id = validated_data.pop('application_id')
+        application = JobApplication.objects.get(id=application_id)
+        validated_data['application'] = application
+        
+        # Update the application status to indicate withdrawal
+        application.status = 'Withdrawn'
+        application.save()
+        
+        return super().create(validated_data)
+    
+    def to_representation(self, instance):
+        """
+        Customize the output representation to include application_id
+        """
+        representation = super().to_representation(instance)
+        representation['application_id'] = instance.application.id
+        return representation
+    
+    def validate(self, data):
+        """
+        Validate application withdrawal data
+        """
+        # Validate that the application exists
+        application_id = data.get('application_id')
+        if application_id:
+            try:
+                application = JobApplication.objects.get(id=application_id)
+                # Check if application is already withdrawn
+                if hasattr(application, 'withdrawal'):
+                    raise serializers.ValidationError(
+                        "This application has already been withdrawn."
+                    )
+                # Check if application is not in a withdrawable state
+                if application.status in ['Accepted', 'Rejected']:
+                    raise serializers.ValidationError(
+                        f"Cannot withdraw application with status '{application.status}'."
+                    )
+            except JobApplication.DoesNotExist:
+                raise serializers.ValidationError(
+                    "Job application with this ID does not exist."
+                )
+        
+        # Validate that reason is provided
+        reason = data.get('reason')
+        if not reason or not reason.strip():
+            raise serializers.ValidationError(
+                "Withdrawal reason is required and cannot be empty."
+            )
+        
+        return data
+
+
+class ApplicationWithdrawalListSerializer(serializers.ModelSerializer):
+    """
+    Simplified serializer for listing application withdrawals
+    """
+    application_id = serializers.IntegerField(source='application.id', read_only=True)
+    
+    class Meta:
+        model = ApplicationWithdrawal
+        fields = [
+            'id', 'application_id', 'withdrawal_date'
         ]

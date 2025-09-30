@@ -56,6 +56,7 @@ urlpatterns = [
     path('api/job-application/', include('jobs.application_urls')),  # Job application endpoints
     path('api/job-interview/', include('jobs.interview_urls')),  # Job interview endpoints
     path('api/job-offer/', include('jobs.offer_urls')),  # Job offer endpoints
+    path('api/application-withdrawal/', include('jobs.withdrawal_urls')),  # Application withdrawal endpoints
     # path('api/auth/', include('accounts.urls')),
 
 

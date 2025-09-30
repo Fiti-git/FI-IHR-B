@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.db import models
-from .models import JobPosting, JobApplication, JobInterview, JobOffer
-from .serializers import JobPostingSerializer, JobApplicationSerializer, JobInterviewSerializer, JobOfferSerializer
+from .models import JobPosting, JobApplication, JobInterview, JobOffer, ApplicationWithdrawal
+from .serializers import JobPostingSerializer, JobApplicationSerializer, JobInterviewSerializer, JobOfferSerializer, ApplicationWithdrawalSerializer
 
 
 class JobPostingViewSet(viewsets.ModelViewSet):
@@ -511,4 +511,119 @@ class JobOfferViewSet(viewsets.ModelViewSet):
         
         return Response({
             "message": "Job offer deleted"
+        }, status=status.HTTP_200_OK)
+
+
+class ApplicationWithdrawalViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for ApplicationWithdrawal model - provides CRUD operations for application withdrawals
+    """
+    queryset = ApplicationWithdrawal.objects.all()
+    serializer_class = ApplicationWithdrawalSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """
+        POST /api/application-withdrawal/
+        Create a new application withdrawal
+        """
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            withdrawal = serializer.save()
+            return Response({
+                "withdrawal_id": withdrawal.id,
+                "message": "Application withdrawn successfully"
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        GET /api/application-withdrawal/{id}/
+        Fetch a specific application withdrawal by its ID
+        """
+        instance = self.get_object()
+        
+        response_data = {
+            "withdrawal_id": instance.id,
+            "application_id": instance.application.id,
+            "withdrawal_date": instance.withdrawal_date.strftime('%Y-%m-%d %H:%M:%S'),
+            "reason": instance.reason
+        }
+        
+        return Response(response_data)
+    
+    def list(self, request, *args, **kwargs):
+        """
+        GET /api/application-withdrawal/
+        Fetch a list of all application withdrawals with optional filtering
+        """
+        queryset = self.get_queryset()
+        
+        # Apply filters based on query parameters
+        application_id = request.query_params.get('application_id')
+        if application_id:
+            queryset = queryset.filter(application_id=application_id)
+        
+        freelancer_id = request.query_params.get('freelancer_id')
+        if freelancer_id:
+            queryset = queryset.filter(application__freelancer_id=freelancer_id)
+        
+        # Format response data
+        withdrawals_list = []
+        for withdrawal in queryset:
+            withdrawals_list.append({
+                "withdrawal_id": withdrawal.id,
+                "application_id": withdrawal.application.id,
+                "withdrawal_date": withdrawal.withdrawal_date.strftime('%Y-%m-%d %H:%M')
+            })
+        
+        return Response({
+            "withdrawals": withdrawals_list
+        })
+    
+    def update(self, request, *args, **kwargs):
+        """
+        PUT /api/application-withdrawal/{id}/
+        Update an existing application withdrawal (only reason can be updated)
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Only allow updating the reason field
+        allowed_fields = ['reason']
+        filtered_data = {key: value for key, value in request.data.items() if key in allowed_fields}
+        
+        serializer = self.get_serializer(instance, data=filtered_data, partial=partial)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Application withdrawal updated"
+            })
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """
+        PATCH /api/application-withdrawal/{id}/
+        Partially update an existing application withdrawal
+        """
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        DELETE /api/application-withdrawal/{id}/
+        Delete an application withdrawal (this will restore the application status)
+        """
+        instance = self.get_object()
+        
+        # Restore the application status to Pending when withdrawal is deleted
+        application = instance.application
+        application.status = 'Pending'
+        application.save()
+        
+        instance.delete()
+        
+        return Response({
+            "message": "Application withdrawal deleted and application status restored"
         }, status=status.HTTP_200_OK)
