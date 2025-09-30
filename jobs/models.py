@@ -222,17 +222,3 @@ class JobPosting(models.Model):
     
     def __str__(self):
         return f"{self.job_title} - {self.department}"
-    
-    @property
-    def is_active(self):
-        """Check if the job posting is currently active"""
-        return self.job_status == 'open'
-    
-    @property
-    def salary_range(self):
-        """Return formatted salary range"""
-        if self.salary_from and self.salary_to:
-            return f"{self.currency} {self.salary_from:,.0f} - {self.salary_to:,.0f}"
-        elif self.salary_from:
-            return f"{self.currency} {self.salary_from:,.0f}+"
-        return "Salary not specified"

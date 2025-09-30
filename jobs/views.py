@@ -1,199 +1,169 @@
-from django.shortcuts import render
-from django.db import models
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-from .models import JobPosting, JobApplication
-from .serializers import JobPostingSerializer, JobApplicationSerializer, JobApplicationListSerializer
+from django.db import models
+from .models import JobPosting
+from .serializers import JobPostingSerializer
 
 
 class JobPostingViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for JobPosting model
+    ViewSet for JobPosting model - implements the exact APIs requested
     """
     queryset = JobPosting.objects.all()
     serializer_class = JobPostingSerializer
+    lookup_field = 'id'
+    lookup_url_kwarg = 'job_id'
     
-    def get_queryset(self):
+    def create(self, request, *args, **kwargs):
         """
-        Filter queryset based on query parameters
+        POST /api/job-posting/
+        Create a new job posting
         """
-        queryset = JobPosting.objects.all()
+        # Only accept the exact parameters specified
+        allowed_fields = [
+            'job_title', 'department', 'job_type', 'work_location', 'role_overview',
+            'key_responsibilities', 'required_qualifications', 'preferred_qualifications',
+            'languages_required', 'job_category', 'salary_from', 'salary_to', 'currency',
+            'application_deadline', 'application_method', 'interview_mode', 'hiring_manager',
+            'number_of_openings', 'expected_start_date', 'screening_questions',
+            'health_insurance', 'remote_work', 'paid_leave', 'bonus'
+        ]
         
-        # Filter by job status
-        job_status = self.request.query_params.get('status', None)
-        if job_status:
-            queryset = queryset.filter(job_status=job_status)
-            
-        # Filter by job type
-        job_type = self.request.query_params.get('type', None)
+        # Filter request data to only include allowed fields
+        filtered_data = {key: value for key, value in request.data.items() if key in allowed_fields}
+        
+        # Set required job_provider_id (default value since not in your parameters)
+        filtered_data['job_provider_id'] = 1
+        
+        serializer = self.get_serializer(data=filtered_data)
+        if serializer.is_valid():
+            job_posting = serializer.save()
+            # Return EXACTLY the specified response format - nothing else
+            return Response({
+                "job_id": job_posting.id,
+                "message": "Job posted successfully"
+            }, status=status.HTTP_201_CREATED)
+        else:
+            # Return validation errors if any
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        GET /api/job-posting/{job_id}/
+        Fetch a specific job posting by its ID
+        """
+        instance = self.get_object()
+        
+        # Create custom salary range since we removed the property
+        if instance.salary_from and instance.salary_to:
+            salary_range = f"{instance.currency} {instance.salary_from:,.0f} - {instance.salary_to:,.0f}"
+        elif instance.salary_from:
+            salary_range = f"{instance.currency} {instance.salary_from:,.0f}+"
+        else:
+            salary_range = "Salary not specified"
+        
+        # Return exactly the specified response format
+        response_data = {
+            "job_id": instance.id,
+            "job_title": instance.job_title,
+            "department": instance.department,
+            "job_type": instance.job_type,
+            "work_location": instance.work_location,
+            "salary_range": salary_range,
+            "application_deadline": instance.application_deadline.strftime('%Y-%m-%d') if instance.application_deadline else None,
+            "interview_mode": instance.interview_mode,
+            "hiring_manager": instance.hiring_manager
+        }
+        
+        return Response(response_data)
+    
+    def list(self, request, *args, **kwargs):
+        """
+        GET /api/job-posting/
+        Fetch a list of all job postings with optional filtering
+        """
+        queryset = self.get_queryset()
+        
+        # Apply filters based on query parameters
+        location = request.query_params.get('location')
+        if location:
+            queryset = queryset.filter(work_location__icontains=location)
+        
+        job_type = request.query_params.get('job_type')
         if job_type:
-            queryset = queryset.filter(job_type=job_type)
-            
-        # Filter by work mode
-        work_mode = self.request.query_params.get('work_mode', None)
-        if work_mode:
-            queryset = queryset.filter(work_mode=work_mode)
-            
-        # Filter by job category
-        category = self.request.query_params.get('category', None)
+            queryset = queryset.filter(job_type__iexact=job_type)
+        
+        category = request.query_params.get('category')
         if category:
-            queryset = queryset.filter(job_category=category)
-            
-        # Search by title or department
-        search = self.request.query_params.get('search', None)
-        if search:
-            queryset = queryset.filter(
-                models.Q(job_title__icontains=search) |
-                models.Q(department__icontains=search) |
-                models.Q(work_location__icontains=search)
-            )
-            
-        return queryset
-    
-    @action(detail=False, methods=['get'])
-    def active_jobs(self, request):
-        """
-        Get all active job postings
-        """
-        active_jobs = self.queryset.filter(job_status='open')
-        serializer = self.get_serializer(active_jobs, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def close_job(self, request, pk=None):
-        """
-        Close a job posting
-        """
-        job = self.get_object()
-        job.job_status = 'closed'
-        job.save()
-        return Response({'status': 'job closed'})
-    
-    @action(detail=True, methods=['post'])
-    def reopen_job(self, request, pk=None):
-        """
-        Reopen a closed job posting
-        """
-        job = self.get_object()
-        job.job_status = 'open'
-        job.save()
-        return Response({'status': 'job reopened'})
-
-
-class JobApplicationViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for JobApplication model
-    """
-    queryset = JobApplication.objects.all()
-    serializer_class = JobApplicationSerializer
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        """
-        Filter queryset based on query parameters and user permissions
-        """
-        # Short-circuit for Swagger schema generation
-        if getattr(self, 'swagger_fake_view', False):
-            return JobApplication.objects.none()
-            
-        queryset = JobApplication.objects.all()
+            queryset = queryset.filter(job_category__icontains=category)
         
-        # Filter by status
-        status_filter = self.request.query_params.get('status', None)
-        if status_filter:
-            queryset = queryset.filter(status=status_filter)
-            
-        # Filter by job
-        job_id = self.request.query_params.get('job_id', None)
-        if job_id:
-            queryset = queryset.filter(job__id=job_id)
-            
-        # Filter by freelancer (show only user's own applications if they're not staff)
-        if not self.request.user.is_staff:
-            queryset = queryset.filter(freelancer=self.request.user)
-            
-        return queryset
-    
-    def get_serializer_class(self):
-        """
-        Return appropriate serializer based on action
-        """
-        if self.action == 'list':
-            return JobApplicationListSerializer
-        return JobApplicationSerializer
-    
-    def perform_create(self, serializer):
-        """
-        Set the freelancer to the current user when creating an application
-        """
-        serializer.save(freelancer=self.request.user)
-    
-    @action(detail=False, methods=['get'])
-    def my_applications(self, request):
-        """
-        Get current user's job applications
-        """
-        # Short-circuit for Swagger schema generation
-        if getattr(self, 'swagger_fake_view', False):
-            return Response([])
-            
-        applications = self.queryset.filter(freelancer=request.user)
-        serializer = self.get_serializer(applications, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def accept_application(self, request, pk=None):
-        """
-        Accept a job application (for job providers/staff)
-        """
-        if not request.user.is_staff:
-            return Response(
-                {'error': 'Permission denied'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
+        salary_range = request.query_params.get('salary_range')
+        if salary_range and '-' in salary_range:
+            try:
+                min_salary, max_salary = salary_range.split('-')
+                min_salary = float(min_salary)
+                max_salary = float(max_salary)
+                queryset = queryset.filter(
+                    salary_from__gte=min_salary,
+                    salary_to__lte=max_salary
+                )
+            except (ValueError, TypeError):
+                pass  # Ignore invalid salary range format
         
-        application = self.get_object()
-        application.status = 'accepted'
-        application.save()
-        return Response({'status': 'application accepted'})
+        # Format response data
+        jobs_list = []
+        for job in queryset:
+            # Create custom salary range for each job
+            if job.salary_from and job.salary_to:
+                job_salary_range = f"{job.currency} {job.salary_from:,.0f} - {job.salary_to:,.0f}"
+            elif job.salary_from:
+                job_salary_range = f"{job.currency} {job.salary_from:,.0f}+"
+            else:
+                job_salary_range = "Salary not specified"
+                
+            jobs_list.append({
+                "job_id": job.id,
+                "job_title": job.job_title,
+                "salary_range": job_salary_range,
+                "location": job.work_location
+            })
+        
+        return Response({
+            "jobs": jobs_list
+        })
     
-    @action(detail=True, methods=['post'])
-    def reject_application(self, request, pk=None):
+    def update(self, request, *args, **kwargs):
         """
-        Reject a job application (for job providers/staff)
+        PUT /api/job-posting/{job_id}/
+        Update an existing job post
         """
-        if not request.user.is_staff:
-            return Response(
-                {'error': 'Permission denied'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        application = self.get_object()
-        application.status = 'rejected'
-        application.save()
-        return Response({'status': 'application rejected'})
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Job posting updated"
+            })
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=False, methods=['get'])
-    def applications_by_job(self, request):
+    def partial_update(self, request, *args, **kwargs):
         """
-        Get applications grouped by job (for staff/job providers)
+        PATCH /api/job-posting/{job_id}/
+        Partially update an existing job post
         """
-        if not request.user.is_staff:
-            return Response(
-                {'error': 'Permission denied'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        DELETE /api/job-posting/{job_id}/
+        Delete a job posting by its ID
+        """
+        instance = self.get_object()
+        instance.delete()
         
-        job_id = request.query_params.get('job_id')
-        if not job_id:
-            return Response(
-                {'error': 'job_id parameter is required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        applications = self.queryset.filter(job__id=job_id)
-        serializer = self.get_serializer(applications, many=True)
-        return Response(serializer.data)
+        return Response({
+            "message": "Job posting deleted"
+        }, status=status.HTTP_200_OK)

@@ -52,7 +52,7 @@ urlpatterns = [
     # App routes
     path('api/support/', include('support.urls')),
     path('api/project/', include('project.urls')),
-    path('api/jobs/', include('jobs.urls')),  # Added jobs URLs
+    path('api/job-posting/', include('jobs.urls')),  # Updated to match API spec
     # path('api/auth/', include('accounts.urls')),
 
 
