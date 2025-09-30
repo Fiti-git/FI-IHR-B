@@ -52,7 +52,8 @@ urlpatterns = [
     # App routes
     path('api/support/', include('support.urls')),
     path('api/project/', include('project.urls')),
-    path('api/job-posting/', include('jobs.urls')),  # Updated to match API spec
+    path('api/job-posting/', include('jobs.urls')),  # Job posting endpoints
+    path('api/job-application/', include('jobs.application_urls')),  # Job application endpoints
     # path('api/auth/', include('accounts.urls')),
 
 

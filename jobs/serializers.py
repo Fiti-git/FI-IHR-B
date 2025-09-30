@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import JobPosting
+from .models import JobPosting, JobApplication
 
 
 class JobPostingSerializer(serializers.ModelSerializer):
@@ -80,4 +80,84 @@ class JobPostingListSerializer(serializers.ModelSerializer):
             'id', 'job_title', 'department', 'job_type', 'work_location',
             'work_mode', 'job_category', 'application_deadline',
             'number_of_openings', 'job_status', 'date_posted'
+        ]
+
+
+class JobApplicationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for JobApplication model
+    """
+    job_id = serializers.IntegerField(write_only=True, help_text="Foreign key to job_posting.id")
+    
+    class Meta:
+        model = JobApplication
+        fields = ['id', 'job_id', 'freelancer_id', 'resume', 'cover_letter', 'expected_rate', 'status', 'date_applied']
+        read_only_fields = ['date_applied']
+    
+    def create(self, validated_data):
+        """
+        Create a new job application
+        """
+        job_id = validated_data.pop('job_id')
+        job = JobPosting.objects.get(id=job_id)
+        validated_data['job'] = job
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        """
+        Update a job application
+        """
+        if 'job_id' in validated_data:
+            job_id = validated_data.pop('job_id')
+            job = JobPosting.objects.get(id=job_id)
+            validated_data['job'] = job
+        return super().update(instance, validated_data)
+    
+    def to_representation(self, instance):
+        """
+        Customize the output representation to include job_id
+        """
+        representation = super().to_representation(instance)
+        representation['job_id'] = instance.job.id
+        return representation
+    
+    def validate(self, data):
+        """
+        Validate job application data
+        """
+        # Validate that expected_rate is positive
+        expected_rate = data.get('expected_rate')
+        if expected_rate and expected_rate <= 0:
+            raise serializers.ValidationError(
+                "Expected rate must be greater than 0."
+            )
+        
+        # Validate that resume URL is provided
+        resume = data.get('resume')
+        if not resume:
+            raise serializers.ValidationError(
+                "Resume URL is required."
+            )
+        
+        # Validate that the job exists
+        job_id = data.get('job_id')
+        if job_id and not JobPosting.objects.filter(id=job_id).exists():
+            raise serializers.ValidationError(
+                "Job posting with this ID does not exist."
+            )
+        
+        return data
+
+
+class JobApplicationListSerializer(serializers.ModelSerializer):
+    """
+    Simplified serializer for listing job applications
+    """
+    job_id = serializers.IntegerField(source='job.id', read_only=True)
+    
+    class Meta:
+        model = JobApplication
+        fields = [
+            'id', 'job_id', 'freelancer_id', 'status', 
+            'expected_rate', 'date_applied'
         ]

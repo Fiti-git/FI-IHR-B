@@ -2,84 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
-class JobApplication(models.Model):
-    """
-    Job application model based on the requirements from job_application.csv
-    """
-    
-    # Foreign key references - positioned right after the implicit id field
-    job = models.ForeignKey(
-        'JobPosting', 
-        on_delete=models.CASCADE, 
-        related_name='applications',
-        help_text="Foreign key to job_posting.id"
-    )
-    freelancer = models.ForeignKey(
-        User, 
-        on_delete=models.CASCADE, 
-        related_name='job_applications',
-        help_text="Foreign key to freelancer_profile.id (using User model)"
-    )
-    
-    # Application details
-    resume = models.URLField(
-        max_length=500,
-        help_text="URL to the freelancer's resume"
-    )
-    cover_letter = models.TextField(
-        help_text="Cover letter submitted by freelancer"
-    )
-    expected_rate = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2,
-        help_text="Freelancer's expected rate"
-    )
-    
-    # Application status
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('accepted', 'Accepted'),
-        ('rejected', 'Rejected'),
-    ]
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='pending',
-        help_text="Application status (Pending, Accepted, Rejected)"
-    )
-    
-    # Metadata
-    date_applied = models.DateTimeField(
-        auto_now_add=True,
-        help_text="Date the freelancer applied"
-    )
-    
-    class Meta:
-        db_table = 'job_application'
-        ordering = ['-date_applied']
-        verbose_name = 'Job Application'
-        verbose_name_plural = 'Job Applications'
-        # Ensure a freelancer can only apply once to the same job
-        unique_together = ['job', 'freelancer']
-    
-    
-    def __str__(self):
-        return f"{self.freelancer.username} - {self.job.job_title}"
-    
-    @property
-    def is_pending(self):
-        """Check if the application is still pending"""
-        return self.status == 'pending'
-    
-    @property
-    def is_accepted(self):
-        """Check if the application has been accepted"""
-        return self.status == 'accepted'
-    
-    @property
-    def is_rejected(self):
-        """Check if the application has been rejected"""
-        return self.status == 'rejected'
+
 
 
 class JobPosting(models.Model):
@@ -222,3 +145,77 @@ class JobPosting(models.Model):
     
     def __str__(self):
         return f"{self.job_title} - {self.department}"
+
+
+class JobApplication(models.Model):
+    """
+    Job application model based on the requirements from job_application.csv
+    Column order: id, job_id, freelancer_id, resume, cover_letter, expected_rate, status, date_applied
+    """
+    
+    # Column 2: job_id (Foreign key to job_posting.id)
+    job = models.ForeignKey(
+        JobPosting, 
+        on_delete=models.CASCADE,
+        help_text="Foreign key to job_posting.id"
+    )
+    
+    # Column 3: freelancer_id (Foreign key to freelancer_profile.id)
+    freelancer_id = models.IntegerField(help_text="Foreign key to freelancer_profile.id")
+    
+    # Column 4: resume
+    resume = models.URLField(help_text="URL to the freelancer's resume")
+    
+    # Column 5: cover_letter
+    cover_letter = models.TextField(help_text="Cover letter submitted by freelancer")
+    
+    # Column 6: expected_rate
+    expected_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Freelancer's expected rate"
+    )
+    
+    # Column 7: status
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('Pending', 'Pending'),
+            ('Accepted', 'Accepted'),
+            ('Rejected', 'Rejected'),
+        ],
+        default='Pending',
+        help_text="Application status (Pending, Accepted, Rejected)"
+    )
+    
+    # Column 8: date_applied
+    date_applied = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Date the freelancer applied"
+    )
+    
+    class Meta:
+        db_table = 'job_application'
+        ordering = ['-date_applied']
+        verbose_name = 'Job Application'
+        verbose_name_plural = 'Job Applications'
+        # Ensure a freelancer can only apply once to the same job
+        unique_together = ['job', 'freelancer_id']
+    
+    def __str__(self):
+        return f"Application {self.id} - Job: {self.job.job_title}"
+    
+    @property
+    def is_pending(self):
+        """Check if the application is still pending"""
+        return self.status == 'Pending'
+    
+    @property
+    def is_accepted(self):
+        """Check if the application has been accepted"""
+        return self.status == 'Accepted'
+    
+    @property
+    def is_rejected(self):
+        """Check if the application has been rejected"""
+        return self.status == 'Rejected'

@@ -107,8 +107,9 @@ class JobApplicationAdmin(admin.ModelAdmin):
     Admin interface for JobApplication model
     """
     list_display = [
-        'freelancer',
+        'id',
         'job',
+        'freelancer_id',
         'status',
         'expected_rate',
         'date_applied'
@@ -122,10 +123,7 @@ class JobApplicationAdmin(admin.ModelAdmin):
     ]
     
     search_fields = [
-        'freelancer__username',
-        'freelancer__first_name',
-        'freelancer__last_name',
-        'freelancer__email',
+        'freelancer_id',
         'job__job_title',
         'job__department'
     ]
@@ -136,7 +134,7 @@ class JobApplicationAdmin(admin.ModelAdmin):
         ('Application Information', {
             'fields': (
                 'job',
-                'freelancer',
+                'freelancer_id',
                 'status'
             )
         }),
@@ -157,5 +155,5 @@ class JobApplicationAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         """Make certain fields readonly for existing objects"""
         if obj:  # editing an existing object
-            return self.readonly_fields + ['job', 'freelancer', 'date_applied']
+            return self.readonly_fields + ['job', 'freelancer_id', 'date_applied']
         return self.readonly_fields
