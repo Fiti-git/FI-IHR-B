@@ -374,7 +374,7 @@ class JobInterviewSerializer(serializers.ModelSerializer):
         model = JobInterview
         fields = [
             'id', 'application_id', 'interview_date', 'interview_mode', 
-            'status', 'interview_notes'
+            'status', 'interview_notes', 'interview_link', 'rating', 'comments'
         ]
     
     def create(self, validated_data):
@@ -436,6 +436,119 @@ class JobInterviewListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'application_id', 'interview_date', 'interview_mode', 'status'
         ]
+
+
+class JobInterviewScheduleSerializer(serializers.ModelSerializer):
+    """
+    Serializer for scheduling interviews
+    """
+    application_id = serializers.IntegerField(write_only=True, help_text="Foreign key to job_application.id")
+    date_time = serializers.DateTimeField(source='interview_date', help_text="Scheduled date and time")
+    
+    class Meta:
+        model = JobInterview
+        fields = [
+            'application_id', 'date_time', 'interview_mode', 
+            'interview_link', 'interview_notes'
+        ]
+    
+    def create(self, validated_data):
+        """
+        Create a new scheduled interview
+        """
+        application_id = validated_data.pop('application_id')
+        application = JobApplication.objects.get(id=application_id)
+        validated_data['application'] = application
+        return super().create(validated_data)
+    
+    def validate(self, data):
+        """
+        Validate interview scheduling data
+        """
+        # Validate that interview_date is not in the past
+        interview_date = data.get('interview_date')
+        if interview_date and interview_date < timezone.now():
+            raise serializers.ValidationError(
+                "Interview date cannot be in the past."
+            )
+        
+        # Validate that the application exists
+        application_id = data.get('application_id')
+        if application_id and not JobApplication.objects.filter(id=application_id).exists():
+            raise serializers.ValidationError(
+                "Job application with this ID does not exist."
+            )
+        
+        return data
+
+
+class JobInterviewDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer for interview details
+    """
+    date_time = serializers.DateTimeField(source='interview_date', help_text="Scheduled date and time")
+    
+    class Meta:
+        model = JobInterview
+        fields = [
+            'id', 'application_id', 'date_time', 'interview_mode',
+            'interview_link', 'interview_notes'
+        ]
+    
+    def to_representation(self, instance):
+        """
+        Customize the output representation
+        """
+        representation = super().to_representation(instance)
+        representation['interview_id'] = instance.id
+        representation['application_id'] = instance.application.id
+        # Remove the 'id' field since we're using 'interview_id'
+        representation.pop('id', None)
+        return representation
+
+
+class JobInterviewFeedbackSerializer(serializers.ModelSerializer):
+    """
+    Serializer for providing interview feedback
+    """
+    interview_id = serializers.IntegerField(write_only=True, help_text="Interview ID")
+    
+    class Meta:
+        model = JobInterview
+        fields = ['interview_id', 'rating', 'comments']
+    
+    def validate_rating(self, value):
+        """
+        Validate rating is between 1 and 5
+        """
+        if value is not None and (value < 1 or value > 5):
+            raise serializers.ValidationError(
+                "Rating must be between 1 and 5."
+            )
+        return value
+
+
+class JobInterviewRescheduleSerializer(serializers.ModelSerializer):
+    """
+    Serializer for rescheduling interviews
+    """
+    interview_id = serializers.IntegerField(write_only=True, help_text="Interview ID")
+    new_date_time = serializers.DateTimeField(source='interview_date', help_text="New scheduled date and time")
+    new_interview_link = serializers.URLField(source='interview_link', required=False, help_text="New interview link")
+    
+    class Meta:
+        model = JobInterview
+        fields = ['interview_id', 'new_date_time', 'new_interview_link']
+    
+    def validate_new_date_time(self, value):
+        """
+        Validate new interview date is not in the past
+        """
+        if value and value < timezone.now():
+            raise serializers.ValidationError(
+                "New interview date cannot be in the past."
+            )
+        return value
 
 
 class JobOfferSerializer(serializers.ModelSerializer):

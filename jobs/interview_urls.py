@@ -16,7 +16,23 @@ job_interview_detail = JobInterviewViewSet.as_view({
     'delete': 'destroy'
 })
 
+# New custom endpoints
+job_interview_schedule = JobInterviewViewSet.as_view({
+    'post': 'schedule_interview'
+})
+
+job_interview_feedback = JobInterviewViewSet.as_view({
+    'post': 'provide_feedback'
+})
+
+job_interview_reschedule = JobInterviewViewSet.as_view({
+    'post': 'reschedule_interview'
+})
+
 urlpatterns = [
     path('', job_interview_list, name='job-interview-list'),
-    path('<int:pk>/', job_interview_detail, name='job-interview-detail'),
+    path('<int:interview_id>/', job_interview_detail, name='job-interview-detail'),
+    path('schedule/', job_interview_schedule, name='job-interview-schedule'),
+    path('feedback/', job_interview_feedback, name='job-interview-feedback'),
+    path('reschedule/', job_interview_reschedule, name='job-interview-reschedule'),
 ]

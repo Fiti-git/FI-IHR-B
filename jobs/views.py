@@ -8,7 +8,9 @@ from .serializers import (
     JobPostingSerializer, JobPostingCreateSerializer, JobApplicationSerializer, 
     JobApplicationCreateSerializer, JobApplicationJobListSerializer, 
     JobApplicationReviewSerializer, JobApplicationUpdateSerializer,
-    JobInterviewSerializer, JobOfferSerializer, ApplicationWithdrawalSerializer
+    JobInterviewSerializer, JobInterviewScheduleSerializer, 
+    JobInterviewDetailSerializer, JobInterviewFeedbackSerializer, 
+    JobInterviewRescheduleSerializer, JobOfferSerializer, ApplicationWithdrawalSerializer
 )
 
 
@@ -370,6 +372,22 @@ class JobInterviewViewSet(viewsets.ModelViewSet):
     """
     queryset = JobInterview.objects.all()
     serializer_class = JobInterviewSerializer
+    lookup_field = 'id'
+    lookup_url_kwarg = 'interview_id'
+    
+    def get_serializer_class(self):
+        """
+        Return the appropriate serializer class based on the action
+        """
+        if self.action == 'schedule_interview':
+            return JobInterviewScheduleSerializer
+        elif self.action == 'retrieve':
+            return JobInterviewDetailSerializer
+        elif self.action == 'provide_feedback':
+            return JobInterviewFeedbackSerializer
+        elif self.action == 'reschedule_interview':
+            return JobInterviewRescheduleSerializer
+        return JobInterviewSerializer
     
     def create(self, request, *args, **kwargs):
         """
@@ -388,17 +406,17 @@ class JobInterviewViewSet(viewsets.ModelViewSet):
     
     def retrieve(self, request, *args, **kwargs):
         """
-        GET /api/job-interview/{id}/
-        Fetch a specific job interview by its ID
+        GET /api/job-interview/{interview_id}/
+        Fetch details of a scheduled interview
         """
         instance = self.get_object()
         
         response_data = {
             "interview_id": instance.id,
             "application_id": instance.application.id,
-            "interview_date": instance.interview_date.strftime('%Y-%m-%d %H:%M:%S'),
+            "date_time": instance.interview_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
             "interview_mode": instance.interview_mode,
-            "status": instance.status,
+            "interview_link": instance.interview_link,
             "interview_notes": instance.interview_notes
         }
         
@@ -478,6 +496,71 @@ class JobInterviewViewSet(viewsets.ModelViewSet):
         return Response({
             "message": "Job interview deleted"
         }, status=status.HTTP_200_OK)
+    
+    def schedule_interview(self, request, *args, **kwargs):
+        """
+        POST /api/job-interview/schedule/
+        Schedule an interview for a selected applicant
+        """
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            interview = serializer.save()
+            return Response({
+                "interview_id": interview.id,
+                "message": "Interview scheduled successfully"
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def provide_feedback(self, request, *args, **kwargs):
+        """
+        POST /api/job-interview/feedback/
+        Provide feedback after an interview
+        """
+        interview_id = request.data.get('interview_id')
+        if not interview_id:
+            return Response({
+                "error": "interview_id is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        interview = get_object_or_404(JobInterview, id=interview_id)
+        serializer = self.get_serializer(interview, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            # Update status to completed when feedback is provided
+            interview.status = 'Completed'
+            interview.save()
+            return Response({
+                "message": "Feedback submitted successfully"
+            })
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def reschedule_interview(self, request, *args, **kwargs):
+        """
+        POST /api/job-interview/reschedule/
+        Reschedule an interview
+        """
+        interview_id = request.data.get('interview_id')
+        if not interview_id:
+            return Response({
+                "error": "interview_id is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        interview = get_object_or_404(JobInterview, id=interview_id)
+        serializer = self.get_serializer(interview, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            # Update status to rescheduled
+            interview.status = 'Rescheduled'
+            interview.save()
+            return Response({
+                "message": "Interview rescheduled successfully"
+            })
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class JobOfferViewSet(viewsets.ModelViewSet):

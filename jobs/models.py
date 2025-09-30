@@ -290,6 +290,27 @@ class JobInterview(models.Model):
         help_text="Notes from the interview"
     )
     
+    # Additional fields for interview link and feedback
+    interview_link = models.URLField(
+        blank=True,
+        null=True,
+        help_text="Link for online interviews (Zoom, Teams, etc.)"
+    )
+    
+    rating = models.DecimalField(
+        max_digits=2,
+        decimal_places=1,
+        blank=True,
+        null=True,
+        help_text="Interview rating from 1 to 5"
+    )
+    
+    comments = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Feedback comments from the interview"
+    )
+    
     # Metadata
     date_created = models.DateTimeField(
         auto_now_add=True,
