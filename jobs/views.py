@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.db import models
 from .models import JobPosting, JobApplication, JobInterview, JobOffer, ApplicationWithdrawal
-from .serializers import JobPostingSerializer, JobApplicationSerializer, JobInterviewSerializer, JobOfferSerializer, ApplicationWithdrawalSerializer
+from .serializers import JobPostingSerializer, JobPostingCreateSerializer, JobApplicationSerializer, JobInterviewSerializer, JobOfferSerializer, ApplicationWithdrawalSerializer
 
 
 class JobPostingViewSet(viewsets.ModelViewSet):
@@ -14,30 +14,27 @@ class JobPostingViewSet(viewsets.ModelViewSet):
     lookup_field = 'id'
     lookup_url_kwarg = 'job_id'
     
+    def get_serializer_class(self):
+        """
+        Return the appropriate serializer class based on the action
+        """
+        if self.action == 'create':
+            return JobPostingCreateSerializer
+        return JobPostingSerializer
+    
     def create(self, request, *args, **kwargs):
         """
         POST /api/job-posting/
         Create a new job posting
         """
-        # Only accept the exact parameters specified
-        allowed_fields = [
-            'job_title', 'department', 'job_type', 'work_location', 'role_overview',
-            'key_responsibilities', 'required_qualifications', 'preferred_qualifications',
-            'languages_required', 'job_category', 'salary_from', 'salary_to', 'currency',
-            'application_deadline', 'application_method', 'interview_mode', 'hiring_manager',
-            'number_of_openings', 'expected_start_date', 'screening_questions',
-            'health_insurance', 'remote_work', 'paid_leave', 'bonus'
-        ]
-        
-        # Filter request data to only include allowed fields
-        filtered_data = {key: value for key, value in request.data.items() if key in allowed_fields}
-        
-        # Set required job_provider_id (default value since not in your parameters)
-        filtered_data['job_provider_id'] = 1
-        
-        serializer = self.get_serializer(data=filtered_data)
+        # Use the create serializer which excludes job_provider_id and work_mode
+        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            job_posting = serializer.save()
+            # Set default values for excluded fields
+            job_posting = serializer.save(
+                job_provider_id=1,  # Set default value since not in request
+                work_mode='on-site'  # Set default value since not in request
+            )
             # Return EXACTLY the specified response format - nothing else
             return Response({
                 "job_id": job_posting.id,
