@@ -16,7 +16,7 @@ job_application_detail = JobApplicationViewSet.as_view({
     'delete': 'destroy'
 })
 
-# New custom endpoints
+# Custom endpoints matching API specifications
 job_application_by_job = JobApplicationViewSet.as_view({
     'get': 'get_applications_for_job'
 })
@@ -30,9 +30,14 @@ job_application_update_status = JobApplicationViewSet.as_view({
 })
 
 urlpatterns = [
+    # POST /api/job-application
     path('', job_application_list, name='job-application-list'),
-    path('<int:job_id>/', job_application_detail, name='job-application-detail'),
+    # GET /api/job-application/{id}
+    path('<int:pk>/', job_application_detail, name='job-application-detail'),
+    # GET /api/job-application/job/{job_id}
     path('job/<int:job_id>/', job_application_by_job, name='job-application-by-job'),
-    path('review/<int:application_id>/', job_application_review, name='job-application-review'),
-    path('update/<int:application_id>/', job_application_update_status, name='job-application-update'),
+    # POST /api/job-application/review/{application_id}
+    path('review/<int:pk>/', job_application_review, name='job-application-review'),
+    # PUT /api/job-application/update/{application_id}
+    path('update/<int:pk>/', job_application_update_status, name='job-application-update'),
 ]

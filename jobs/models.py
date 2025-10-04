@@ -152,7 +152,6 @@ class JobApplication(models.Model):
     Job application model based on the requirements from job_application.csv
     Column order: id, job_id, freelancer_id, resume, cover_letter, expected_rate, status, date_applied
     """
-    
     # Column 2: job_id (Foreign key to job_posting.id)
     job = models.ForeignKey(
         JobPosting, 
@@ -173,6 +172,8 @@ class JobApplication(models.Model):
     expected_rate = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        null=True,
+        blank=True,
         help_text="Freelancer's expected rate"
     )
     

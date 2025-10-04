@@ -6,755 +6,372 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .models import JobPosting, JobApplication, JobInterview, JobOffer, ApplicationWithdrawal
 from .serializers import (
-    JobPostingSerializer, JobPostingCreateSerializer, JobApplicationSerializer, 
-    JobApplicationCreateSerializer, JobApplicationJobListSerializer, 
-    JobApplicationReviewSerializer, JobApplicationUpdateSerializer,
-    JobInterviewSerializer, JobInterviewScheduleSerializer, 
-    JobInterviewDetailSerializer, JobInterviewFeedbackSerializer, 
-    JobInterviewRescheduleSerializer, JobOfferSerializer, 
-    JobOfferCreateSerializer, JobOfferAcceptSerializer, JobOfferRejectSerializer,
+    JobPostingSerializer, JobApplicationSerializer, 
+    JobInterviewSerializer, JobOfferSerializer,
     ApplicationWithdrawalSerializer
 )
 
-
 class JobPostingViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for JobPosting model - implements the exact APIs requested
+    Simplified JobPosting ViewSet following the example pattern
     """
     queryset = JobPosting.objects.all()
     serializer_class = JobPostingSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'job_id'
     
-    def get_serializer_class(self):
-        """
-        Return the appropriate serializer class based on the action
-        """
-        if self.action == 'create':
-            return JobPostingCreateSerializer
-        return JobPostingSerializer
-    
     def create(self, request, *args, **kwargs):
-        """
-        POST /api/job-posting/
-        Create a new job posting
-        """
-        # Use the create serializer which excludes job_provider_id and work_mode
+        """POST /api/job-posting/ - Create a new job posting"""
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            # Set default values for excluded fields
-            job_posting = serializer.save(
-                job_provider_id=1,  # Set default value since not in request
-                work_mode='on-site'  # Set default value since not in request
-            )
-            # Return EXACTLY the specified response format - nothing else
+            job = serializer.save()
             return Response({
-                "job_id": job_posting.id,
+                "job_id": job.id,
                 "message": "Job posted successfully"
             }, status=status.HTTP_201_CREATED)
-        else:
-            # Return validation errors if any
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def retrieve(self, request, *args, **kwargs):
-        """
-        GET /api/job-posting/{job_id}/
-        Fetch a specific job posting by its ID
-        """
+        """GET /api/job-posting/{job_id} - Fetch specific job posting"""
         instance = self.get_object()
-        
-        # Create custom salary range since we removed the property
-        if instance.salary_from and instance.salary_to:
-            salary_range = f"{instance.currency} {instance.salary_from:,.0f} - {instance.salary_to:,.0f}"
-        elif instance.salary_from:
-            salary_range = f"{instance.currency} {instance.salary_from:,.0f}+"
-        else:
-            salary_range = "Salary not specified"
-        
-        # Return exactly the specified response format
-        response_data = {
+        return Response({
             "job_id": instance.id,
             "job_title": instance.job_title,
             "department": instance.department,
             "job_type": instance.job_type,
             "work_location": instance.work_location,
-            "salary_range": salary_range,
+            "salary_range": f"{instance.salary_from:,} - {instance.salary_to:,} {instance.currency}",
             "application_deadline": instance.application_deadline.strftime('%Y-%m-%d') if instance.application_deadline else None,
             "interview_mode": instance.interview_mode,
             "hiring_manager": instance.hiring_manager
-        }
-        
-        return Response(response_data)
+        })
     
     def list(self, request, *args, **kwargs):
-        """
-        GET /api/job-posting/
-        Fetch a list of all job postings with optional filtering
-        """
+        """GET /api/job-posting/ - Fetch all job postings with optional filtering"""
         queryset = self.get_queryset()
         
-        # Apply filters based on query parameters
+        # Apply filters from query parameters
         location = request.query_params.get('location')
         if location:
             queryset = queryset.filter(work_location__icontains=location)
         
         job_type = request.query_params.get('job_type')
         if job_type:
-            queryset = queryset.filter(job_type__iexact=job_type)
+            queryset = queryset.filter(job_type__icontains=job_type)
         
         category = request.query_params.get('category')
         if category:
             queryset = queryset.filter(job_category__icontains=category)
         
-        salary_range = request.query_params.get('salary_range')
-        if salary_range and '-' in salary_range:
-            try:
-                min_salary, max_salary = salary_range.split('-')
-                min_salary = float(min_salary)
-                max_salary = float(max_salary)
-                queryset = queryset.filter(
-                    salary_from__gte=min_salary,
-                    salary_to__lte=max_salary
-                )
-            except (ValueError, TypeError):
-                pass  # Ignore invalid salary range format
-        
-        # Format response data
+        # Format response
         jobs_list = []
         for job in queryset:
-            # Create custom salary range for each job
-            if job.salary_from and job.salary_to:
-                job_salary_range = f"{job.currency} {job.salary_from:,.0f} - {job.salary_to:,.0f}"
-            elif job.salary_from:
-                job_salary_range = f"{job.currency} {job.salary_from:,.0f}+"
-            else:
-                job_salary_range = "Salary not specified"
-                
             jobs_list.append({
                 "job_id": job.id,
                 "job_title": job.job_title,
-                "salary_range": job_salary_range,
+                "salary_range": f"{job.salary_from:,} - {job.salary_to:,} {job.currency}" if job.salary_from and job.salary_to else "Not specified",
                 "location": job.work_location
             })
         
-        return Response({
-            "jobs": jobs_list
-        })
+        return Response({"jobs": jobs_list})
     
     def update(self, request, *args, **kwargs):
-        """
-        PUT /api/job-posting/{job_id}/
-        Update an existing job post
-        """
+        """PUT /api/job-posting/{job_id} - Update job posting"""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         if serializer.is_valid():
             serializer.save()
-            return Response({
-                "message": "Job posting updated"
-            })
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def partial_update(self, request, *args, **kwargs):
-        """
-        PATCH /api/job-posting/{job_id}/
-        Partially update an existing job post
-        """
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
+            return Response({"message": "Job posting updated"})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def destroy(self, request, *args, **kwargs):
-        """
-        DELETE /api/job-posting/{job_id}/
-        Delete a job posting by its ID
-        """
+        """DELETE /api/job-posting/{job_id} - Delete job posting"""
         instance = self.get_object()
         instance.delete()
+        return Response({"message": "Job posting deleted"}, status=status.HTTP_200_OK)
         
-        return Response({
-            "message": "Job posting deleted"
-        }, status=status.HTTP_200_OK)
-
+        return Response(
+            {'error': 'Invalid status'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 class JobApplicationViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for JobApplication model - provides CRUD operations for job applications
+    Simplified JobApplication ViewSet following the example pattern
     """
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationSerializer
-    lookup_field = 'id'
-    lookup_url_kwarg = 'job_id'
-    
-    def get_serializer_class(self):
-        """
-        Return the appropriate serializer class based on the action
-        """
-        if self.action == 'create':
-            return JobApplicationCreateSerializer
-        elif self.action == 'get_applications_for_job':
-            return JobApplicationJobListSerializer
-        elif self.action == 'review_application':
-            return JobApplicationReviewSerializer
-        elif self.action == 'update_application_status':
-            return JobApplicationUpdateSerializer
-        return JobApplicationSerializer
     
     def create(self, request, *args, **kwargs):
-        """
-        POST /api/job-application/
-        Create a new job application
-        """
+        """POST /api/job-application - Apply to job"""
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            application = serializer.save()
+            # Get job_id from validated data and remove it
+            job_id = serializer.validated_data.pop('job_id')
+            
+            try:
+                job = JobPosting.objects.get(id=job_id)
+            except JobPosting.DoesNotExist:
+                return Response(
+                    {"error": "Job posting not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Create the application manually to ensure proper field handling
+            application = JobApplication.objects.create(
+                job=job,
+                freelancer_id=serializer.validated_data['freelancer_id'],
+                resume=serializer.validated_data['resume'],
+                cover_letter=serializer.validated_data['cover_letter'],
+            )
+            
             return Response({
                 "application_id": application.id,
                 "message": "Application submitted successfully"
             }, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @action(detail=False, methods=['get'], url_path='job/(?P<job_id>[0-9]+)')
     def get_applications_for_job(self, request, job_id=None):
-        """
-        GET /api/job-application/job/{job_id}/
-        Fetch all applications for a specific job
-        """
-        # Get all applications for the specified job
-        applications = JobApplication.objects.filter(job_id=job_id)
+        """GET /api/job-application/job/{job_id} - Fetch applications for a job"""
+        applications = self.queryset.filter(job_id=job_id)
         
-        if not applications.exists():
-            return Response({
-                "applications": []
-            })
-        
-        serializer = self.get_serializer(applications, many=True)
-        return Response({
-            "applications": serializer.data
-        })
-    
-    def review_application(self, request, application_id=None):
-        """
-        POST /api/job-application/review/{application_id}/
-        Review and rate an application
-        """
-        application = get_object_or_404(JobApplication, id=application_id)
-        serializer = self.get_serializer(application, data=request.data, partial=True)
-        
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Application reviewed and rated successfully",
-                "application_id": application.id,
-                "status": application.status,
-                "rating": application.rating,
-                "comments": application.comments
-            })
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def update_application_status(self, request, application_id=None):
-        """
-        PUT /api/job-application/update/{application_id}/
-        Update application status and rating
-        """
-        application = get_object_or_404(JobApplication, id=application_id)
-        serializer = self.get_serializer(application, data=request.data, partial=True)
-        
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Application status and rating updated successfully",
-                "application_id": application.id,
-                "status": application.status,
-                "rating": application.rating,
-                "comments": application.comments
-            })
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def retrieve(self, request, *args, **kwargs):
-        """
-        GET /api/job-application/{id}/
-        Fetch a specific job application by its ID
-        """
-        instance = self.get_object()
-        
-        response_data = {
-            "application_id": instance.id,
-            "job_id": instance.job.id,
-            "job_title": instance.job.job_title,
-            "freelancer_id": instance.freelancer_id,
-            "resume": instance.resume,
-            "cover_letter": instance.cover_letter,
-            "expected_rate": str(instance.expected_rate),
-            "status": instance.status,
-            "date_applied": instance.date_applied.strftime('%Y-%m-%d %H:%M:%S')
-        }
-        
-        return Response(response_data)
-    
-    def list(self, request, *args, **kwargs):
-        """
-        GET /api/job-application/
-        Fetch a list of all job applications with optional filtering
-        """
-        queryset = self.get_queryset()
-        
-        # Apply filters based on query parameters
-        job_id = request.query_params.get('job_id')
-        if job_id:
-            queryset = queryset.filter(job_id=job_id)
-        
-        freelancer_id = request.query_params.get('freelancer_id')
-        if freelancer_id:
-            queryset = queryset.filter(freelancer_id=freelancer_id)
-        
-        status_filter = request.query_params.get('status')
-        if status_filter:
-            queryset = queryset.filter(status__iexact=status_filter)
-        
-        # Format response data
         applications_list = []
-        for app in queryset:
+        for app in applications:
             applications_list.append({
                 "application_id": app.id,
-                "job_id": app.job.id,
-                "job_title": app.job.job_title,
-                "freelancer_id": app.freelancer_id,
-                "status": app.status,
-                "expected_rate": str(app.expected_rate),
-                "date_applied": app.date_applied.strftime('%Y-%m-%d')
+                "freelancer_name": f"Freelancer {app.freelancer_id}",  # Simplified
+                "resume_url": app.resume,
+                "cover_letter_url": app.cover_letter,
+                "status": app.status
             })
         
+        return Response({"applications": applications_list})
+    
+    @action(detail=True, methods=['post'], url_path='review')
+    def review_application(self, request, pk=None):
+        """POST /api/job-application/review/{application_id} - Review and rate application"""
+        application = self.get_object()
+        
+        rating = request.data.get('rating')
+        status_value = request.data.get('status')
+        comments = request.data.get('comments')
+        
+        if rating:
+            application.rating = rating
+        if status_value:
+            application.status = status_value
+        if comments:
+            application.comments = comments
+        
+        application.save()
+        
         return Response({
-            "applications": applications_list
+            "message": "Application reviewed and rated successfully",
+            "application_id": application.id,
+            "status": application.status,
+            "rating": application.rating,
+            "comments": application.comments
         })
     
-    def update(self, request, *args, **kwargs):
-        """
-        PUT /api/job-application/{id}/
-        Update an existing job application
-        """
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Job application updated"
-            })
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def partial_update(self, request, *args, **kwargs):
-        """
-        PATCH /api/job-application/{id}/
-        Partially update an existing job application
-        """
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
-    
-    def destroy(self, request, *args, **kwargs):
-        """
-        DELETE /api/job-application/{id}/
-        Delete a job application by its ID
-        """
-        instance = self.get_object()
-        instance.delete()
+    @action(detail=True, methods=['put'], url_path='update')
+    def update_application_status(self, request, pk=None):
+        """PUT /api/job-application/update/{application_id} - Update application status and rating"""
+        application = self.get_object()
+        
+        status_value = request.data.get('status')
+        rating = request.data.get('rating')
+        comments = request.data.get('comments')
+        
+        if status_value:
+            application.status = status_value
+        if rating:
+            application.rating = rating
+        if comments:
+            application.comments = comments
+        
+        application.save()
         
         return Response({
-            "message": "Job application deleted"
-        }, status=status.HTTP_200_OK)
+            "message": "Application status and rating updated successfully",
+            "application_id": application.id,
+            "status": application.status,
+            "rating": application.rating,
+            "comments": application.comments
+        })
 
 
 class JobInterviewViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for JobInterview model - provides CRUD operations for job interviews
+    Simplified JobInterview ViewSet following the example pattern
     """
     queryset = JobInterview.objects.all()
     serializer_class = JobInterviewSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'interview_id'
     
-    def get_serializer_class(self):
-        """
-        Return the appropriate serializer class based on the action
-        """
-        if self.action == 'schedule_interview':
-            return JobInterviewScheduleSerializer
-        elif self.action == 'retrieve':
-            return JobInterviewDetailSerializer
-        elif self.action == 'provide_feedback':
-            return JobInterviewFeedbackSerializer
-        elif self.action == 'reschedule_interview':
-            return JobInterviewRescheduleSerializer
-        return JobInterviewSerializer
-    
-    def create(self, request, *args, **kwargs):
-        """
-        POST /api/job-interview/
-        Create a new job interview
-        """
+    @action(detail=False, methods=['post'], url_path='schedule')
+    def schedule_interview(self, request):
+        """POST /api/job-interview/schedule - Schedule an interview"""
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            interview = serializer.save()
+            # Get application_id from validated data and remove it
+            application_id = serializer.validated_data.pop('application_id')
+            
+            try:
+                application = JobApplication.objects.get(id=application_id)
+            except JobApplication.DoesNotExist:
+                return Response(
+                    {"error": "Job application not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Create the interview manually to ensure proper field handling
+            interview = JobInterview.objects.create(
+                application=application,
+                interview_date=serializer.validated_data['interview_date'],
+                interview_mode=serializer.validated_data['interview_mode'],
+                interview_link=serializer.validated_data.get('interview_link', ''),
+                interview_notes=serializer.validated_data.get('interview_notes', ''),
+                status='Scheduled'
+            )
+            
             return Response({
                 "interview_id": interview.id,
                 "message": "Interview scheduled successfully"
             }, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def retrieve(self, request, *args, **kwargs):
-        """
-        GET /api/job-interview/{interview_id}/
-        Fetch details of a scheduled interview
-        """
+        """GET /api/job-interview/{interview_id} - Fetch interview details"""
         instance = self.get_object()
-        
-        response_data = {
+        return Response({
             "interview_id": instance.id,
             "application_id": instance.application.id,
-            "date_time": instance.interview_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "date_time": instance.interview_date.strftime('%Y-%m-%dT%H:%M:%SZ') if instance.interview_date else None,
             "interview_mode": instance.interview_mode,
             "interview_link": instance.interview_link,
             "interview_notes": instance.interview_notes
-        }
-        
-        return Response(response_data)
-    
-    def list(self, request, *args, **kwargs):
-        """
-        GET /api/job-interview/
-        Fetch a list of all job interviews with optional filtering
-        """
-        queryset = self.get_queryset()
-        
-        # Apply filters based on query parameters
-        application_id = request.query_params.get('application_id')
-        if application_id:
-            queryset = queryset.filter(application_id=application_id)
-        
-        freelancer_id = request.query_params.get('freelancer_id')
-        if freelancer_id:
-            queryset = queryset.filter(application__freelancer_id=freelancer_id)
-        
-        status_filter = request.query_params.get('status')
-        if status_filter:
-            queryset = queryset.filter(status__iexact=status_filter)
-        
-        interview_mode = request.query_params.get('interview_mode')
-        if interview_mode:
-            queryset = queryset.filter(interview_mode__iexact=interview_mode)
-        
-        # Format response data
-        interviews_list = []
-        for interview in queryset:
-            interviews_list.append({
-                "interview_id": interview.id,
-                "application_id": interview.application.id,
-                "interview_date": interview.interview_date.strftime('%Y-%m-%d %H:%M'),
-                "interview_mode": interview.interview_mode,
-                "status": interview.status
-            })
-        
-        return Response({
-            "interviews": interviews_list
         })
     
-    def update(self, request, *args, **kwargs):
-        """
-        PUT /api/job-interview/{id}/
-        Update an existing job interview
-        """
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Job interview updated"
-            })
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def partial_update(self, request, *args, **kwargs):
-        """
-        PATCH /api/job-interview/{id}/
-        Partially update an existing job interview
-        """
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
-    
-    def destroy(self, request, *args, **kwargs):
-        """
-        DELETE /api/job-interview/{id}/
-        Delete a job interview by its ID
-        """
-        instance = self.get_object()
-        instance.delete()
-        
-        return Response({
-            "message": "Job interview deleted"
-        }, status=status.HTTP_200_OK)
-    
-    def schedule_interview(self, request, *args, **kwargs):
-        """
-        POST /api/job-interview/schedule/
-        Schedule an interview for a selected applicant
-        """
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            interview = serializer.save()
-            return Response({
-                "interview_id": interview.id,
-                "message": "Interview scheduled successfully"
-            }, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def provide_feedback(self, request, *args, **kwargs):
-        """
-        POST /api/job-interview/feedback/
-        Provide feedback after an interview
-        """
+    @action(detail=False, methods=['post'], url_path='feedback')
+    def provide_feedback(self, request):
+        """POST /api/job-interview/feedback - Provide interview feedback"""
         interview_id = request.data.get('interview_id')
         if not interview_id:
-            return Response({
-                "error": "interview_id is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "interview_id is required"}, status=status.HTTP_400_BAD_REQUEST)
         
         interview = get_object_or_404(JobInterview, id=interview_id)
-        serializer = self.get_serializer(interview, data=request.data, partial=True)
         
-        if serializer.is_valid():
-            serializer.save()
-            # Update status to completed when feedback is provided
-            interview.status = 'Completed'
-            interview.save()
-            return Response({
-                "message": "Feedback submitted successfully"
-            })
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        rating = request.data.get('rating')
+        comments = request.data.get('comments')
+        
+        if rating:
+            interview.rating = rating
+        if comments:
+            interview.comments = comments
+        interview.status = 'Completed'
+        interview.save()
+        
+        return Response({"message": "Feedback submitted successfully"})
     
-    def reschedule_interview(self, request, *args, **kwargs):
-        """
-        POST /api/job-interview/reschedule/
-        Reschedule an interview
-        """
+    @action(detail=False, methods=['post'], url_path='reschedule')
+    def reschedule_interview(self, request):
+        """POST /api/job-interview/reschedule - Reschedule an interview"""
         interview_id = request.data.get('interview_id')
         if not interview_id:
-            return Response({
-                "error": "interview_id is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "interview_id is required"}, status=status.HTTP_400_BAD_REQUEST)
         
         interview = get_object_or_404(JobInterview, id=interview_id)
-        serializer = self.get_serializer(interview, data=request.data, partial=True)
         
-        if serializer.is_valid():
-            serializer.save()
-            # Update status to rescheduled
-            interview.status = 'Rescheduled'
-            interview.save()
-            return Response({
-                "message": "Interview rescheduled successfully"
-            })
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        new_date_time = request.data.get('new_date_time')
+        new_interview_link = request.data.get('new_interview_link')
+        
+        if new_date_time:
+            from datetime import datetime
+            interview.interview_date = datetime.fromisoformat(new_date_time.replace('Z', '+00:00'))
+        if new_interview_link:
+            interview.interview_link = new_interview_link
+        interview.status = 'Rescheduled'
+        interview.save()
+        
+        return Response({"message": "Interview rescheduled successfully"})
 
 
-class JobOfferViewSet(viewsets.ViewSet):
+class JobOfferViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for JobOffer model - provides only the specified custom operations
+    Simplified JobOffer ViewSet following the example pattern
     """
+    queryset = JobOffer.objects.all()
+    serializer_class = JobOfferSerializer
     
-    def get_serializer_class(self):
-        """
-        Return the appropriate serializer class based on the action
-        """
-        if self.action == 'create_offer':
-            return JobOfferCreateSerializer
-        elif self.action == 'accept_offer':
-            return JobOfferAcceptSerializer
-        elif self.action == 'reject_offer':
-            return JobOfferRejectSerializer
-        return JobOfferSerializer
-    
-    def create_offer(self, request, *args, **kwargs):
-        """
-        POST /api/job-offer/create/
-        Create a job offer for an accepted candidate
-        """
-        serializer = self.get_serializer_class()(data=request.data)
+    @action(detail=False, methods=['post'], url_path='create')
+    def create_offer(self, request):
+        """POST /api/job-offer/create - Create a job offer"""
+        serializer = JobOfferCreateSerializer(data=request.data)
         if serializer.is_valid():
-            offer = serializer.save()
+            # Get validated data
+            application_id = serializer.validated_data['application_id']
+            offer_details_obj = serializer.validated_data['offer_details']
+            offer_status = serializer.validated_data.get('offer_status', 'Pending')
+            
+            try:
+                application = JobApplication.objects.get(id=application_id)
+            except JobApplication.DoesNotExist:
+                return Response(
+                    {"error": "Job application not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Convert offer_details object to JSON string for storage
+            import json
+            offer_details_str = json.dumps(offer_details_obj)
+            
+            # Create the job offer manually to ensure proper field handling
+            offer = JobOffer.objects.create(
+                application=application,
+                offer_details=offer_details_str,
+                offer_status=offer_status
+            )
+            
             return Response({
                 "offer_id": offer.id,
                 "message": "Job offer created successfully"
             }, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    def accept_offer(self, request, *args, **kwargs):
-        """
-        POST /api/job-offer/accept/
-        Freelancer accepts the job offer
-        """
-        offer_id = request.data.get('offer_id')
-        if not offer_id:
-            return Response({
-                "error": "offer_id is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=['post'], url_path='accept')
+    def accept_offer(self, request):
+        """POST /api/job-offer/accept - Accept a job offer"""
+        serializer = JobOfferActionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
+        offer_id = serializer.validated_data['offer_id']
         offer = get_object_or_404(JobOffer, id=offer_id)
-        
-        # Update offer status to accepted
         offer.offer_status = 'Accepted'
         offer.date_accepted = timezone.now()
         offer.date_rejected = None
         offer.save()
-        
-        return Response({
-            "message": "Job offer accepted"
-        })
+        return Response({'message': 'Job offer accepted'})
     
-    def reject_offer(self, request, *args, **kwargs):
-        """
-        POST /api/job-offer/reject/
-        Freelancer rejects the job offer
-        """
-        offer_id = request.data.get('offer_id')
-        if not offer_id:
-            return Response({
-                "error": "offer_id is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=['post'], url_path='reject')
+    def reject_offer(self, request):
+        """POST /api/job-offer/reject - Reject a job offer"""
+        serializer = JobOfferActionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
+        offer_id = serializer.validated_data['offer_id']
         offer = get_object_or_404(JobOffer, id=offer_id)
-        
-        # Update offer status to rejected
         offer.offer_status = 'Rejected'
         offer.date_rejected = timezone.now()
         offer.date_accepted = None
         offer.save()
-        
-        return Response({
-            "message": "Job offer rejected"
-        })
+        return Response({'message': 'Job offer rejected'})
 
 
 class ApplicationWithdrawalViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for ApplicationWithdrawal model - provides CRUD operations for application withdrawals
-    """
     queryset = ApplicationWithdrawal.objects.all()
     serializer_class = ApplicationWithdrawalSerializer
-    
-    def create(self, request, *args, **kwargs):
-        """
-        POST /api/application-withdrawal/
-        Create a new application withdrawal
-        """
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            withdrawal = serializer.save()
-            return Response({
-                "withdrawal_id": withdrawal.id,
-                "message": "Application withdrawn successfully"
-            }, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def retrieve(self, request, *args, **kwargs):
-        """
-        GET /api/application-withdrawal/{id}/
-        Fetch a specific application withdrawal by its ID
-        """
-        instance = self.get_object()
-        
-        response_data = {
-            "withdrawal_id": instance.id,
-            "application_id": instance.application.id,
-            "withdrawal_date": instance.withdrawal_date.strftime('%Y-%m-%d %H:%M:%S'),
-            "reason": instance.reason
-        }
-        
-        return Response(response_data)
-    
-    def list(self, request, *args, **kwargs):
-        """
-        GET /api/application-withdrawal/
-        Fetch a list of all application withdrawals with optional filtering
-        """
-        queryset = self.get_queryset()
-        
-        # Apply filters based on query parameters
-        application_id = request.query_params.get('application_id')
-        if application_id:
-            queryset = queryset.filter(application_id=application_id)
-        
-        freelancer_id = request.query_params.get('freelancer_id')
-        if freelancer_id:
-            queryset = queryset.filter(application__freelancer_id=freelancer_id)
-        
-        # Format response data
-        withdrawals_list = []
-        for withdrawal in queryset:
-            withdrawals_list.append({
-                "withdrawal_id": withdrawal.id,
-                "application_id": withdrawal.application.id,
-                "withdrawal_date": withdrawal.withdrawal_date.strftime('%Y-%m-%d %H:%M')
-            })
-        
-        return Response({
-            "withdrawals": withdrawals_list
-        })
-    
-    def update(self, request, *args, **kwargs):
-        """
-        PUT /api/application-withdrawal/{id}/
-        Update an existing application withdrawal (only reason can be updated)
-        """
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        
-        # Only allow updating the reason field
-        allowed_fields = ['reason']
-        filtered_data = {key: value for key, value in request.data.items() if key in allowed_fields}
-        
-        serializer = self.get_serializer(instance, data=filtered_data, partial=partial)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Application withdrawal updated"
-            })
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def partial_update(self, request, *args, **kwargs):
-        """
-        PATCH /api/application-withdrawal/{id}/
-        Partially update an existing application withdrawal
-        """
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
-    
-    def destroy(self, request, *args, **kwargs):
-        """
-        DELETE /api/application-withdrawal/{id}/
-        Delete an application withdrawal (this will restore the application status)
-        """
-        instance = self.get_object()
-        
-        # Restore the application status to Pending when withdrawal is deleted
-        application = instance.application
-        application.status = 'Pending'
-        application.save()
-        
-        instance.delete()
-        
-        return Response({
-            "message": "Application withdrawal deleted and application status restored"
-        }, status=status.HTTP_200_OK)
