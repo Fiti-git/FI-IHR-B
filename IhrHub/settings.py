@@ -52,7 +52,17 @@ INSTALLED_APPS = [
     'project',
     'myapi',
     'apps.chat',
-    'user', 
+    'user',
+    'rest_framework.authtoken',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
+    'allauth.socialaccount.providers.google',
+    'anymail',
+    'django.contrib.sites',
+    
 ]
 
 SITE_ID = 1
@@ -166,7 +176,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'IHRDB',
         'USER': 'postgres',
-        'PASSWORD': 'postgres',
+        'PASSWORD': 'Admin',
         'HOST': 'localhost',
         'PORT': '5432',
     }
