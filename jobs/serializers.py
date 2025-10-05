@@ -25,6 +25,36 @@ class JobApplicationSerializer(serializers.ModelSerializer):
         read_only_fields = ['date_applied', 'status', 'rating', 'comments']
 
 
+class JobApplicationUpdateSerializer(serializers.Serializer):
+    """
+    Serializer for updating job application status - only update fields
+    """
+    rating = serializers.DecimalField(
+        max_digits=2, 
+        decimal_places=1, 
+        min_value=1, 
+        max_value=5,
+        required=False,
+        help_text="Rating from 1 to 5"
+    )
+    status = serializers.ChoiceField(
+        choices=[
+            ('Pending', 'Pending'),
+            ('Accepted', 'Accepted'),
+            ('Rejected', 'Rejected'),
+            ('Save for Later', 'Save for Later'),
+        ],
+        required=False,
+        help_text="Application status"
+    )
+    comments = serializers.CharField(
+        max_length=1000,
+        required=False,
+        allow_blank=True,
+        help_text="Update comments"
+    )
+
+
 class JobInterviewSerializer(serializers.ModelSerializer):
     """
     Simplified JobInterview serializer - common fields only

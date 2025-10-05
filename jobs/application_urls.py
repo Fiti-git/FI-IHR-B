@@ -32,12 +32,12 @@ job_application_update_status = JobApplicationViewSet.as_view({
 urlpatterns = [
     # POST /api/job-application
     path('', job_application_list, name='job-application-list'),
-    # GET /api/job-application/{id}
-    path('<int:pk>/', job_application_detail, name='job-application-detail'),
+    # GET /api/job-application/{application_id}
+    path('<int:application_id>/', job_application_detail, name='job-application-detail'),
     # GET /api/job-application/job/{job_id}
     path('job/<int:job_id>/', job_application_by_job, name='job-application-by-job'),
     # POST /api/job-application/review/{application_id}
-    path('review/<int:pk>/', job_application_review, name='job-application-review'),
+    path('review/<int:application_id>/', job_application_review, name='job-application-review'),
     # PUT /api/job-application/update/{application_id}
-    path('update/<int:pk>/', job_application_update_status, name='job-application-update'),
+    path('update/<int:application_id>/', job_application_update_status, name='job-application-update'),
 ]

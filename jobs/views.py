@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .models import JobPosting, JobApplication, JobInterview, JobOffer, ApplicationWithdrawal
 from .serializers import (
-    JobPostingSerializer, JobApplicationSerializer, 
+    JobPostingSerializer, JobApplicationSerializer, JobApplicationUpdateSerializer,
     JobInterviewSerializer, JobOfferSerializer,
     ApplicationWithdrawalSerializer
 )
@@ -102,6 +102,8 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
     """
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationSerializer
+    lookup_field = 'id'
+    lookup_url_kwarg = 'application_id'
     
     def create(self, request, *args, **kwargs):
         """POST /api/job-application - Apply to job"""
@@ -150,7 +152,7 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         return Response({"applications": applications_list})
     
     @action(detail=True, methods=['post'], url_path='review')
-    def review_application(self, request, pk=None):
+    def review_application(self, request, application_id=None):
         """POST /api/job-application/review/{application_id} - Review and rate application"""
         application = self.get_object()
         
@@ -175,20 +177,27 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
             "comments": application.comments
         })
     
-    @action(detail=True, methods=['put'], url_path='update')
-    def update_application_status(self, request, pk=None):
+    @action(detail=True, methods=['put'], url_path='update', serializer_class=JobApplicationUpdateSerializer)
+    def update_application_status(self, request, application_id=None):
         """PUT /api/job-application/update/{application_id} - Update application status and rating"""
         application = self.get_object()
         
-        status_value = request.data.get('status')
-        rating = request.data.get('rating')
-        comments = request.data.get('comments')
+        # Use the dedicated update serializer for validation
+        serializer = JobApplicationUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
+        # Get validated data
+        status_value = serializer.validated_data.get('status')
+        rating = serializer.validated_data.get('rating')
+        comments = serializer.validated_data.get('comments')
+        
+        # Update application with provided data
         if status_value:
             application.status = status_value
-        if rating:
+        if rating is not None:
             application.rating = rating
-        if comments:
+        if comments is not None:
             application.comments = comments
         
         application.save()
