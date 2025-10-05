@@ -13,8 +13,15 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 import os
+from dotenv import load_dotenv   # 👈 add this
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+
+
+# Load environment variables from .env
+load_dotenv(os.path.join(BASE_DIR, ".env"))  # 👈 add this
 
 
 # Quick-start development settings - unsuitable for production
@@ -43,7 +50,6 @@ INSTALLED_APPS = [
     'drf_yasg',         
     'support',
     'project',
-    'rest_framework_simplejwt.token_blacklist',
     'myapi',
     'apps.chat',
     'user',
@@ -59,62 +65,8 @@ INSTALLED_APPS = [
     
 ]
 
-SITE_ID = 1
 
-AUTHENTICATION_BACKENDS = (
-    'django.contrib.auth.backends.ModelBackend',
-    'allauth.account.auth_backends.AuthenticationBackend',
-)
-
-ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
-ACCOUNT_AUTHENTICATION_METHOD = 'email'
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_UNIQUE_EMAIL = True
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = False
-
-EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
-DEFAULT_FROM_EMAIL = "noreply@zomotopos.site"
-
-ANYMAIL = {
-    "MAILGUN_API_KEY": "",
-    "MAILGUN_SENDER_DOMAIN": "zomotopos.site",
-}
-
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    ),
- }
-
-REST_AUTH = {
-    'USE_JWT': True,
-    'JWT_AUTH_HTTPONLY': False, # allows JWT to be read by JS
-    # We will use a custom serializer to return user details upon login
-    'USER_DETAILS_SERIALIZER': 'myapi.serializers.UserDetailsSerializer',
-    # Custom Social Login View
-    'SOCIAL_LOGIN_SERIALIZER': 'myapi.serializers.CustomSocialLoginSerializer',
-    'VERIFY_EMAIL_SERIALIZER': 'myapi.serializers.CustomVerifyEmailSerializer',
-    'ACCOUNT_CONFIRM_EMAIL_URL': '/api/auth/registration/verify-email/?key={key}',
-}
-
-SOCIALACCOUNT_ADAPTER = 'myapi.adapter.CustomSocialAccountAdapter'
-
-LOGIN_REDIRECT_URL = '/auth/success/'
-ACCOUNT_LOGOUT_REDIRECT_URL = '/'
-
-SIMPLE_JWT = {
-     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
-     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-     'ROTATE_REFRESH_TOKENS': True,
-     'BLACKLIST_AFTER_ROTATION': True,
- }
-
-MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  
+MIDDLEWARE = [ 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -122,8 +74,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    "allauth.account.middleware.AccountMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -232,3 +183,20 @@ SWAGGER_SETTINGS = {
     },
     'USE_SESSION_AUTH': False,
 }
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+
+# Social auth keys
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+
+LINKEDIN_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID")
+LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET")
+LINKEDIN_REDIRECT_URI = os.getenv("LINKEDIN_REDIRECT_URI")
+
