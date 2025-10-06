@@ -6,10 +6,12 @@ from .models import JobPosting, JobApplication, JobInterview, JobOffer, Applicat
 class JobPostingSerializer(serializers.ModelSerializer):
     """
     Simplified JobPosting serializer - common fields only
+    Excludes job_provider_id from POST requests (handled automatically)
     """
     class Meta:
         model = JobPosting
         fields = '__all__'
+        read_only_fields = ['job_provider_id','job_status']
 
 
 class JobApplicationSerializer(serializers.ModelSerializer):
@@ -21,8 +23,7 @@ class JobApplicationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = JobApplication
-        fields = ['id', 'job_id', 'freelancer_id', 'resume', 'cover_letter', 'date_applied', 'status', 'rating', 'comments']
-        read_only_fields = ['date_applied', 'status', 'rating', 'comments']
+        fields = '__all__'
 
 
 class JobApplicationUpdateSerializer(serializers.Serializer):
@@ -74,8 +75,61 @@ class JobOfferSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = JobOffer
-        fields = ['id', 'offer_status', 'date_offered', 'date_accepted', 'date_rejected']
+        fields = ['id', 'offer_status', 'offer_details', 'date_offered', 'date_accepted', 'date_rejected']
         read_only_fields = ['id', 'date_offered', 'date_accepted', 'date_rejected']
+
+
+class JobOfferCreateSerializer(serializers.Serializer):
+    """
+    Serializer for creating job offers with structured offer details
+    """
+    application_id = serializers.IntegerField(help_text="ID of the job application")
+    offer_details = serializers.JSONField(
+        help_text="Structured offer details including salary, start_date, and benefits"
+    )
+    offer_status = serializers.ChoiceField(
+        choices=[
+            ('Pending', 'Pending'),
+            ('Accepted', 'Accepted'),
+            ('Rejected', 'Rejected'),
+            ('Withdrawn', 'Withdrawn'),
+        ],
+        default='Pending',
+        help_text="Status of the offer"
+    )
+    
+    def validate_offer_details(self, value):
+        """
+        Validate the offer_details structure
+        """
+        required_fields = ['salary', 'start_date', 'benefits']
+        missing_fields = [field for field in required_fields if field not in value]
+        
+        if missing_fields:
+            raise serializers.ValidationError(
+                f"Missing required fields in offer_details: {', '.join(missing_fields)}"
+            )
+        
+        # Validate salary is numeric
+        try:
+            salary = float(value['salary'])
+            if salary <= 0:
+                raise serializers.ValidationError("Salary must be a positive number")
+        except (ValueError, TypeError):
+            raise serializers.ValidationError("Salary must be a valid number")
+        
+        # Validate start_date format
+        try:
+            from datetime import datetime
+            datetime.strptime(value['start_date'], '%Y-%m-%d')
+        except ValueError:
+            raise serializers.ValidationError("start_date must be in YYYY-MM-DD format")
+        
+        # Validate benefits is a list
+        if not isinstance(value['benefits'], list):
+            raise serializers.ValidationError("Benefits must be a list")
+        
+        return value
 
 
 class ApplicationWithdrawalSerializer(serializers.ModelSerializer):

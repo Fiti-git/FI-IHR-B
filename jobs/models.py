@@ -4,7 +4,6 @@ from django.contrib.auth.models import User
 
 
 
-
 class JobPosting(models.Model):
     """
     Job posting model based on the requirements from Table.csv
