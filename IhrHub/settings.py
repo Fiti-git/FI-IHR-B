@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'myapi',
     'apps.chat',
     'user',
+    'profiles',
     'rest_framework.authtoken',
     'allauth',
     'allauth.account',
