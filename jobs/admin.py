@@ -47,7 +47,7 @@ class JobPostingAdmin(admin.ModelAdmin):
             'fields': (
                 'job_title',
                 'department', 
-                'job_provider_id',
+                'job_provider',
                 'job_type',
                 'job_category',
                 'work_location',

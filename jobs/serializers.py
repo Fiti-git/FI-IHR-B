@@ -6,12 +6,12 @@ from .models import JobPosting, JobApplication, JobInterview, JobOffer, Applicat
 class JobPostingSerializer(serializers.ModelSerializer):
     """
     Simplified JobPosting serializer - common fields only
-    Excludes job_provider_id from POST requests (handled automatically)
+    Excludes job_provider (handled automatically for authenticated users)
     """
     class Meta:
         model = JobPosting
         fields = '__all__'
-        read_only_fields = ['job_provider_id','job_status']
+    read_only_fields = ['job_provider','job_status']
 
 
 class JobApplicationSerializer(serializers.ModelSerializer):

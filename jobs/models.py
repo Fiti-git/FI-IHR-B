@@ -9,8 +9,13 @@ class JobPosting(models.Model):
     Job posting model based on the requirements from Table.csv
     """
     
-    # Job provider reference (assuming it's from another app/model)
-    job_provider_id = models.IntegerField(help_text="Foreign key to job_provider_profile.id")
+    # Job provider reference (ForeignKey to profiles.JobProviderProfile)
+    job_provider = models.ForeignKey(
+        'profiles.JobProviderProfile',
+        on_delete=models.CASCADE,
+        related_name='job_postings',
+        help_text="Foreign key to profiles.JobProviderProfile"
+    )
     
     # Basic job information
     job_title = models.CharField(max_length=255, help_text="Job title")
@@ -119,7 +124,8 @@ class JobPosting(models.Model):
     # Benefits
     health_insurance = models.BooleanField(default=False, help_text="Health insurance offered?")
     remote_work = models.BooleanField(default=False, help_text="Remote work allowed?")
-    paid_leave = models.BooleanField(default=False, help_text="Number of Paid leaves offered?")
+    # Number of paid leaves offered (use integer to represent number of days)
+    paid_leave = models.IntegerField(default=0, help_text="Number of paid leaves offered")
     bonus = models.BooleanField(default=False, help_text="Bonus offered?")
     
     # Metadata
