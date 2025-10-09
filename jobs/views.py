@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import models
@@ -17,17 +17,29 @@ class JobPostingViewSet(viewsets.ModelViewSet):
     serializer_class = JobPostingSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'job_id'
+    permission_classes = [permissions.IsAuthenticated]  # Add authentication requirement
     
     def create(self, request, *args, **kwargs):
         """POST /api/job-posting - Create job posting"""
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            # Set job_provider_id automatically (could be from authenticated user or default)
-            job = serializer.save(job_provider_id=request.user.id if request.user.is_authenticated else 1)
-            return Response({
-                "job_id": job.id,
-                "message": "Job posted successfully"
-            }, status=status.HTTP_201_CREATED)
+            from profiles.models import JobProviderProfile
+            try:
+                if request.user.is_authenticated:
+                    job_provider = JobProviderProfile.objects.get(user=request.user)
+                    job = serializer.save(job_provider=job_provider)
+                    return Response({
+                        "job_id": job.id,
+                        "message": "Job posted successfully"
+                    }, status=status.HTTP_201_CREATED)
+                else:
+                    return Response({
+                        "error": "Authentication required to create job posting"
+                    }, status=status.HTTP_401_UNAUTHORIZED)
+            except JobProviderProfile.DoesNotExist:
+                return Response({
+                    "error": "Job provider profile not found"
+                }, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def retrieve(self, request, *args, **kwargs):

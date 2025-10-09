@@ -10,8 +10,8 @@ class JobPostingSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = JobPosting
-        fields = '__all__'
-    read_only_fields = ['job_provider','job_status']
+        exclude = ['job_provider']
+        read_only_fields = ['job_status']
 
 
 class JobApplicationSerializer(serializers.ModelSerializer):
