@@ -54,6 +54,7 @@ urlpatterns = [
     path('api/project/', include('project.urls')),
     path('api/job-', include('jobs.urls')),  # Job posting and related endpoints
     # path('api/auth/', include('accounts.urls')),
+    path('api/profile/', include('profiles.urls')),
 
 
     # Login and Registration routes
