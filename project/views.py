@@ -1,453 +1,296 @@
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework import viewsets, status
+from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.utils import timezone
+from rest_framework.permissions import IsAuthenticated, AllowAny  # Add AllowAny
 from django.shortcuts import get_object_or_404
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.contrib.auth.models import User
 
-from .models import Project, Proposal, Milestone, MilestonePayment, Feedback
+from .models import Project, Proposal, Milestone, MilestonePayment, Feedback, ProjectTag
 from .serializers import (
     ProjectSerializer, ProposalSerializer, MilestoneSerializer,
-    MilestonePaymentSerializer, FeedbackSerializer
+    MilestonePaymentSerializer, FeedbackSerializer, ProjectTagSerializer
 )
 
 
-# ==================== PROJECT APIs ====================
-
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get list of all projects",
-    manual_parameters=[
-        openapi.Parameter('status', openapi.IN_QUERY, description="Filter by status", type=openapi.TYPE_STRING),
-        openapi.Parameter('category', openapi.IN_QUERY, description="Filter by category", type=openapi.TYPE_STRING),
-        openapi.Parameter('employer', openapi.IN_QUERY, description="Filter by employer ID", type=openapi.TYPE_INTEGER),
-    ],
-    responses={200: ProjectSerializer(many=True)}
-)
-@swagger_auto_schema(
-    method='post',
-    operation_description="Create a new project",
-    request_body=ProjectSerializer,
-    responses={201: ProjectSerializer}
-)
-@api_view(['GET', 'POST'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def project_list(request):
+class ProjectViewSet(viewsets.ModelViewSet):
     """
-    GET: List all projects
-    POST: Create new project
+    ViewSet for managing projects.
+    Provides CRUD operations for projects.
     """
-    if request.method == 'GET':
-        projects = Project.objects.all().order_by('-created_at')
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer
+    permission_classes = [AllowAny]  # Change this line
+    
+    # TODO: Restore authentication after testing
+    """
+    def get_permissions(self):
+        # Instantiates and returns the list of permissions that this view requires.
+        # - Allow anyone to list and retrieve projects
+        # - Require authentication for create, update, delete
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [AllowAny]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    """
+    
+    from django.contrib.auth.models import User
+
+class ProjectViewSet(viewsets.ModelViewSet):
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer
+    permission_classes = [AllowAny]
+    
+    def perform_create(self, serializer):
+        """Create project with user handling"""
+        try:
+            # Check if user is authenticated
+            if self.request.user and self.request.user.is_authenticated:
+                serializer.save(user=self.request.user)
+            else:
+                # For testing: get or create a default user
+                user, created = User.objects.get_or_create(
+                    username='default_user',
+                    defaults={
+                        'email': 'default@example.com',
+                        'first_name': 'Default',
+                        'last_name': 'User'
+                    }
+                )
+                if created:
+                    user.set_password('password123')
+                    user.save()
+                    print(f"Created default user: {user.username}")
+                
+                serializer.save(user=user)
+                print(f"Project created with user: {user.username}")
+                
+        except Exception as e:
+            print(f"Error in perform_create: {str(e)}")
+            raise
+    
+    def get_queryset(self):
+        queryset = Project.objects.all()
+        # Filter by status
+        status_param = self.request.query_params.get('status', None)
+        if status_param:
+            queryset = queryset.filter(status=status_param)
         
-        # Filters
-        status_filter = request.query_params.get('status')
-        category_filter = request.query_params.get('category')
-        employer_filter = request.query_params.get('employer')
+        # Filter by category
+        category = self.request.query_params.get('category', None)
+        if category:
+            queryset = queryset.filter(category=category)
         
-        if status_filter:
-            projects = projects.filter(status=status_filter)
-        if category_filter:
-            projects = projects.filter(category=category_filter)
-        if employer_filter:
-            projects = projects.filter(employer_id=employer_filter)
+        # Filter by user (client's projects)
+        user_id = self.request.query_params.get('user_id', None)
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
         
-        serializer = ProjectSerializer(projects, many=True)
-        return Response(serializer.data)
+        return queryset
     
-    elif request.method == 'POST':
-        serializer = ProjectSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=True, methods=['post'])
+    def add_tag(self, request, pk=None):
+        """Add a tag to a project"""
+        project = self.get_object()
+        tag_name = request.data.get('tag')
+        
+        if not tag_name:
+            return Response({'error': 'Tag name is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        tag, created = ProjectTag.objects.get_or_create(project=project, tag=tag_name)
+        serializer = ProjectTagSerializer(tag)
+        
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get project details",
-    responses={200: ProjectSerializer}
-)
-@swagger_auto_schema(
-    method='put',
-    operation_description="Update project",
-    request_body=ProjectSerializer,
-    responses={200: ProjectSerializer}
-)
-@swagger_auto_schema(
-    method='delete',
-    operation_description="Delete project",
-    responses={204: 'Project deleted successfully'}
-)
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def project_detail(request, pk):
+class ProposalViewSet(viewsets.ModelViewSet):
     """
-    GET: Get single project
-    PUT: Update project
-    DELETE: Delete project
+    ViewSet for managing proposals.
+    Freelancers can submit proposals for projects.
     """
-    project = get_object_or_404(Project, pk=pk)
+    queryset = Proposal.objects.all()
+    serializer_class = ProposalSerializer
+    permission_classes = [AllowAny]
     
-    if request.method == 'GET':
-        serializer = ProjectSerializer(project)
-        return Response(serializer.data)
-    
-    elif request.method == 'PUT':
-        serializer = ProjectSerializer(project, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    elif request.method == 'DELETE':
-        project.delete()
-        return Response({'message': 'Project deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
-
-
-@swagger_auto_schema(
-    method='put',
-    operation_description="Update project status",
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            'status': openapi.Schema(type=openapi.TYPE_STRING, description='Project status (open/in_progress/completed)')
-        }
-    ),
-    responses={200: 'Status updated'}
-)
-@api_view(['PUT'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def project_update_status(request, pk):
-    """
-    PUT: Update project status
-    """
-    project = get_object_or_404(Project, pk=pk)
-    new_status = request.data.get('status')
-    
-    if new_status not in ['open', 'in_progress', 'completed']:
-        return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    project.status = new_status
-    project.save()
-    return Response({'message': 'Status updated', 'status': project.status})
-
-
-# ==================== PROPOSAL APIs ====================
-
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get list of all proposals",
-    manual_parameters=[
-        openapi.Parameter('project_id', openapi.IN_QUERY, description="Filter by project ID", type=openapi.TYPE_INTEGER),
-    ],
-    responses={200: ProposalSerializer(many=True)}
-)
-@swagger_auto_schema(
-    method='post',
-    operation_description="Submit a new proposal",
-    request_body=ProposalSerializer,
-    responses={201: ProposalSerializer}
-)
-@api_view(['GET', 'POST'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def proposal_list(request):
-    """
-    GET: List all proposals
-    POST: Create new proposal
-    """
-    if request.method == 'GET':
-        proposals = Proposal.objects.all().order_by('-submitted_at')
+    def get_queryset(self):
+        queryset = Proposal.objects.all()
         
         # Filter by project
-        project_id = request.query_params.get('project_id')
+        project_id = self.request.query_params.get('project_id', None)
         if project_id:
-            proposals = proposals.filter(project_id=project_id)
+            queryset = queryset.filter(project_id=project_id)
         
-        serializer = ProposalSerializer(proposals, many=True)
+        # Filter by freelancer
+        freelancer_id = self.request.query_params.get('freelancer_id', None)
+        if freelancer_id:
+            queryset = queryset.filter(freelancer_id=freelancer_id)
+        
+        # Filter by status
+        status_param = self.request.query_params.get('status', None)
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+        
+        return queryset
+    
+    @action(detail=True, methods=['patch'])
+    def accept(self, request, pk=None):
+        """Accept a proposal"""
+        proposal = self.get_object()
+        proposal.status = 'accepted'
+        proposal.save()
+        serializer = self.get_serializer(proposal)
         return Response(serializer.data)
     
-    elif request.method == 'POST':
-        serializer = ProposalSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=True, methods=['patch'])
+    def reject(self, request, pk=None):
+        """Reject a proposal"""
+        proposal = self.get_object()
+        proposal.status = 'rejected'
+        proposal.save()
+        serializer = self.get_serializer(proposal)
+        return Response(serializer.data)
 
 
+class MilestoneViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing milestones.
+    """
+    queryset = Milestone.objects.all()
+    serializer_class = MilestoneSerializer
+    permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        queryset = Milestone.objects.all()
+        
+        # Filter by project
+        project_id = self.request.query_params.get('project_id', None)
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        
+        # Filter by freelancer
+        freelancer_id = self.request.query_params.get('freelancer_id', None)
+        if freelancer_id:
+            queryset = queryset.filter(freelancer_id=freelancer_id)
+        
+        # Filter by status
+        status_param = self.request.query_params.get('status', None)
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+        
+        return queryset
+    
+    @action(detail=True, methods=['patch'])
+    def complete(self, request, pk=None):
+        """Mark milestone as completed"""
+        milestone = self.get_object()
+        milestone.status = 'completed'
+        milestone.save()
+        serializer = self.get_serializer(milestone)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['patch'])
+    def approve(self, request, pk=None):
+        """Approve a completed milestone"""
+        milestone = self.get_object()
+        milestone.status = 'approved'
+        milestone.save()
+        serializer = self.get_serializer(milestone)
+        return Response(serializer.data)
+
+
+class MilestonePaymentViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing milestone payments.
+    """
+    queryset = MilestonePayment.objects.all()
+    serializer_class = MilestonePaymentSerializer
+    permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        queryset = MilestonePayment.objects.all()
+        
+        # Filter by project
+        project_id = self.request.query_params.get('project_id', None)
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        
+        # Filter by freelancer
+        freelancer_id = self.request.query_params.get('freelancer_id', None)
+        if freelancer_id:
+            queryset = queryset.filter(freelancer_id=freelancer_id)
+        
+        # Filter by payment status
+        payment_status = self.request.query_params.get('payment_status', None)
+        if payment_status:
+            queryset = queryset.filter(payment_status=payment_status)
+        
+        return queryset
+    
+    @action(detail=True, methods=['patch'])
+    def release_payment(self, request, pk=None):
+        """Release payment to freelancer"""
+        from django.utils import timezone
+        
+        payment = self.get_object()
+        payment.payment_status = 'released'
+        payment.released_at = timezone.now()
+        payment.save()
+        serializer = self.get_serializer(payment)
+        return Response(serializer.data)
+
+
+class FeedbackViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing feedback.
+    """
+    queryset = Feedback.objects.all()
+    serializer_class = FeedbackSerializer
+    permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        queryset = Feedback.objects.all()
+        
+        # Filter by project
+        project_id = self.request.query_params.get('project_id', None)
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        
+        # Filter by freelancer
+        freelancer_id = self.request.query_params.get('freelancer_id', None)
+        if freelancer_id:
+            queryset = queryset.filter(freelancer_id=freelancer_id)
+        
+        # Filter by client
+        client_id = self.request.query_params.get('client_id', None)
+        if client_id:
+            queryset = queryset.filter(client_id=client_id)
+        
+        return queryset
+
+
+# API Health Check for Swagger
 @swagger_auto_schema(
     method='get',
-    operation_description="Get proposal details",
-    responses={200: ProposalSerializer}
+    operation_description="API Health Check - Check if the API is running",
+    responses={200: openapi.Response('API is running successfully')}
 )
 @api_view(['GET'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def proposal_detail(request, pk):
+def api_health_check(request):
     """
-    GET: Get single proposal
+    Simple API endpoint to check if the API is running.
+    This endpoint can be used to test Swagger documentation.
     """
-    proposal = get_object_or_404(Proposal, pk=pk)
-    serializer = ProposalSerializer(proposal)
-    return Response(serializer.data)
-
-
-@swagger_auto_schema(
-    method='put',
-    operation_description="Update proposal status (accept/reject)",
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            'status': openapi.Schema(type=openapi.TYPE_STRING, description='Proposal status (accepted/rejected)')
-        }
-    ),
-    responses={200: 'Proposal status updated'}
-)
-@api_view(['PUT'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def proposal_update_status(request, pk):
-    """
-    PUT: Update proposal status (accept/reject)
-    """
-    proposal = get_object_or_404(Proposal, pk=pk)
-    new_status = request.data.get('status')
-    
-    if new_status not in ['accepted', 'rejected']:
-        return Response({'error': 'Invalid status. Use "accepted" or "rejected"'}, 
-                       status=status.HTTP_400_BAD_REQUEST)
-    
-    proposal.status = new_status
-    proposal.save()
-    
-    # If accepted, assign freelancer to project
-    if new_status == 'accepted':
-        project = proposal.project
-        project.freelancer = proposal.freelancer
-        project.status = 'in_progress'
-        project.save()
-    
-    return Response({'message': f'Proposal {new_status}', 'status': proposal.status})
-
-
-# ==================== MILESTONE APIs ====================
-
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get list of all milestones",
-    manual_parameters=[
-        openapi.Parameter('project_id', openapi.IN_QUERY, description="Filter by project ID", type=openapi.TYPE_INTEGER),
-    ],
-    responses={200: MilestoneSerializer(many=True)}
-)
-@swagger_auto_schema(
-    method='post',
-    operation_description="Create a new milestone",
-    request_body=MilestoneSerializer,
-    responses={201: MilestoneSerializer}
-)
-@api_view(['GET', 'POST'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def milestone_list(request):
-    """
-    GET: List all milestones
-    POST: Create new milestone
-    """
-    if request.method == 'GET':
-        milestones = Milestone.objects.all().order_by('-created_at')
-        
-        # Filter by project
-        project_id = request.query_params.get('project_id')
-        if project_id:
-            milestones = milestones.filter(project_id=project_id)
-        
-        serializer = MilestoneSerializer(milestones, many=True)
-        return Response(serializer.data)
-    
-    elif request.method == 'POST':
-        serializer = MilestoneSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get milestone details",
-    responses={200: MilestoneSerializer}
-)
-@swagger_auto_schema(
-    method='put',
-    operation_description="Update milestone",
-    request_body=MilestoneSerializer,
-    responses={200: MilestoneSerializer}
-)
-@swagger_auto_schema(
-    method='delete',
-    operation_description="Delete milestone",
-    responses={204: 'Milestone deleted'}
-)
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def milestone_detail(request, pk):
-    """
-    GET: Get single milestone
-    PUT: Update milestone
-    DELETE: Delete milestone
-    """
-    milestone = get_object_or_404(Milestone, pk=pk)
-    
-    if request.method == 'GET':
-        serializer = MilestoneSerializer(milestone)
-        return Response(serializer.data)
-    
-    elif request.method == 'PUT':
-        serializer = MilestoneSerializer(milestone, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    elif request.method == 'DELETE':
-        milestone.delete()
-        return Response({'message': 'Milestone deleted'}, status=status.HTTP_204_NO_CONTENT)
-
-
-@swagger_auto_schema(
-    method='post',
-    operation_description="Mark milestone as complete",
-    responses={200: 'Milestone marked as completed'}
-)
-@api_view(['POST'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def milestone_complete(request, pk):
-    """
-    POST: Mark milestone as complete
-    """
-    milestone = get_object_or_404(Milestone, pk=pk)
-    milestone.status = 'completed'
-    milestone.save()
-    return Response({'message': 'Milestone marked as completed', 'status': milestone.status})
-
-
-# ==================== PAYMENT APIs ====================
-
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get list of all payments",
-    responses={200: MilestonePaymentSerializer(many=True)}
-)
-@swagger_auto_schema(
-    method='post',
-    operation_description="Create payment for milestone",
-    request_body=MilestonePaymentSerializer,
-    responses={201: MilestonePaymentSerializer}
-)
-@api_view(['GET', 'POST'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def payment_list(request):
-    """
-    GET: List all payments
-    POST: Create payment for milestone
-    """
-    if request.method == 'GET':
-        payments = MilestonePayment.objects.all().order_by('-created_at')
-        serializer = MilestonePaymentSerializer(payments, many=True)
-        return Response(serializer.data)
-    
-    elif request.method == 'POST':
-        serializer = MilestonePaymentSerializer(data=request.data)
-        if serializer.is_valid():
-            payment = serializer.save()
-            payment.payment_date = timezone.now()
-            payment.payment_status = 'completed'
-            payment.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@swagger_auto_schema(
-    method='post',
-    operation_description="Release payment to freelancer",
-    responses={200: 'Payment released to freelancer'}
-)
-@api_view(['POST'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def payment_release(request, pk):
-    """
-    POST: Release payment to freelancer
-    """
-    payment = get_object_or_404(MilestonePayment, pk=pk)
-    payment.payment_status = 'released'
-    payment.released_at = timezone.now()
-    payment.save()
-    
-    # Update milestone status
-    milestone = payment.milestone
-    milestone.status = 'approved'
-    milestone.save()
-    
     return Response({
-        'message': 'Payment released to freelancer',
-        'payment_status': payment.payment_status,
-        'released_at': payment.released_at
-    })
-
-
-# ==================== FEEDBACK APIs ====================
-
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get list of all feedback",
-    manual_parameters=[
-        openapi.Parameter('project_id', openapi.IN_QUERY, description="Filter by project ID", type=openapi.TYPE_INTEGER),
-    ],
-    responses={200: FeedbackSerializer(many=True)}
-)
-@swagger_auto_schema(
-    method='post',
-    operation_description="Submit feedback for a project",
-    request_body=FeedbackSerializer,
-    responses={201: FeedbackSerializer}
-)
-@api_view(['GET', 'POST'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def feedback_list(request):
-    """
-    GET: List all feedback
-    POST: Submit feedback
-    """
-    if request.method == 'GET':
-        feedbacks = Feedback.objects.all().order_by('-submitted_at')
-        
-        # Filter by project
-        project_id = request.query_params.get('project_id')
-        if project_id:
-            feedbacks = feedbacks.filter(project_id=project_id)
-        
-        serializer = FeedbackSerializer(feedbacks, many=True)
-        return Response(serializer.data)
-    
-    elif request.method == 'POST':
-        serializer = FeedbackSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get feedback details",
-    responses={200: FeedbackSerializer}
-)
-@api_view(['GET'])
-@permission_classes([AllowAny])  # Changed to AllowAny
-def feedback_detail(request, pk):
-    """
-    GET: Get single feedback
-    """
-    feedback = get_object_or_404(Feedback, pk=pk)
-    serializer = FeedbackSerializer(feedback)
-    return Response(serializer.data)
+        'status': 'success',
+        'message': 'Freelancer API is running successfully!',
+        'version': '1.0.0',
+        'endpoints': {
+            'projects': '/api/projects/',
+            'proposals': '/api/proposals/',
+            'milestones': '/api/milestones/',
+            'payments': '/api/payments/',
+            'feedbacks': '/api/feedbacks/',
+        }
+    }, status=status.HTTP_200_OK)

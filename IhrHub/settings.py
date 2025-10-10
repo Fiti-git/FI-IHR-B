@@ -62,8 +62,18 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'anymail',
     'django.contrib.sites',
-    
 ]
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
 
 
 MIDDLEWARE = [ 
@@ -75,6 +85,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "corsheaders.middleware.CorsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -92,6 +103,8 @@ CSRF_TRUSTED_ORIGINS  = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+
 
 ROOT_URLCONF = 'IhrHub.urls'
 print (f"DIRS': {[os.path.join(BASE_DIR, 'templates')]}")

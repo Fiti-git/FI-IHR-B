@@ -14,7 +14,10 @@ schema_view = get_schema_view(
     openapi.Info(
         title="IhrHub API",
         default_version='v1',
-        description="API documentation for IhrHub",
+        description="API documentation for IhrHub - Freelancer Platform with Project Management, Proposals, Milestones, Payments, and Feedback",
+        terms_of_service="https://www.ihrhub.com/terms/",
+        contact=openapi.Contact(email="contact@ihrhub.com"),
+        license=openapi.License(name="BSD License"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
@@ -53,7 +56,6 @@ urlpatterns = [
     path('api/support/', include('support.urls')),
     path('api/project/', include('project.urls')),
     # path('api/auth/', include('accounts.urls')),
-
 
     # Login and Registration routes
     path('myapi/', include('myapi.urls')),
