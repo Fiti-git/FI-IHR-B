@@ -2,8 +2,6 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
-
-
 class JobPosting(models.Model):
     """
     Job posting model based on the requirements from Table.csv
@@ -124,8 +122,8 @@ class JobPosting(models.Model):
     # Benefits
     health_insurance = models.BooleanField(default=False, help_text="Health insurance offered?")
     remote_work = models.BooleanField(default=False, help_text="Remote work allowed?")
-    # Number of paid leaves offered (use integer to represent number of days)
-    paid_leave = models.IntegerField(default=0, help_text="Number of paid leaves offered")
+    # Paid leave benefit
+    paid_leave = models.BooleanField(default=False, help_text="Paid leave offered?")
     bonus = models.BooleanField(default=False, help_text="Bonus offered?")
     
     # Metadata
