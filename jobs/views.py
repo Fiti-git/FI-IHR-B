@@ -17,7 +17,7 @@ class JobPostingViewSet(viewsets.ModelViewSet):
     serializer_class = JobPostingSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'job_id'
-    #permission_classes = [permissions.IsAuthenticated]  # Add authentication requirement
+    permission_classes = [permissions.IsAuthenticated]  # Add authentication requirement
     
     def create(self, request, *args, **kwargs):
         """POST /api/job-posting - Create job posting"""
@@ -25,14 +25,7 @@ class JobPostingViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             from profiles.models import JobProviderProfile
             try:
-                # TEMPORARY: For testing, always use the first JobProviderProfile
-                job_provider = JobProviderProfile.objects.first()
-                if not job_provider:
-                    # If no JobProviderProfile exists, create one for testing
-                    from django.contrib.auth.models import User
-                    test_user, _ = User.objects.get_or_create(username='testuser')
-                    job_provider = JobProviderProfile.objects.create(user=test_user)
-                
+                job_provider = JobProviderProfile.objects.filter(user=request.user).first()
                 job = serializer.save(job_provider=job_provider)
                 return Response({
                     "job_id": job.id,
@@ -83,7 +76,10 @@ class JobPostingViewSet(viewsets.ModelViewSet):
                 "job_id": job.id,
                 "job_title": job.job_title,
                 "salary_range": f"{job.salary_from:,} - {job.salary_to:,} {job.currency}" if job.salary_from and job.salary_to else "Not specified",
-                "location": job.work_location
+                "location": job.work_location,
+                "date_posted": job.date_posted.strftime('%Y-%m-%d') if job.date_posted else None,
+                "job_status": job.job_status,
+                "job_category": job.job_category
             })
         
         return Response({"jobs": jobs_list})
