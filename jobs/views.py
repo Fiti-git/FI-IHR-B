@@ -46,10 +46,29 @@ class JobPostingViewSet(viewsets.ModelViewSet):
             "department": instance.department,
             "job_type": instance.job_type,
             "work_location": instance.work_location,
-            "salary_range": f"{instance.salary_from:,} - {instance.salary_to:,} {instance.currency}",
+            "work_mode": instance.work_mode,
+            "role_overview": instance.role_overview,
+            "key_responsibilities": instance.key_responsibilities,
+            "required_qualifications": instance.required_qualifications,
+            "preferred_qualifications": instance.preferred_qualifications,
+            "language_required": instance.languages_required,
+            "category": instance.job_category,
+            "salary_from": instance.salary_from,
+            "salary_to": instance.salary_to,
+            "currency": instance.currency,
             "application_deadline": instance.application_deadline.strftime('%Y-%m-%d') if instance.application_deadline else None,
             "interview_mode": instance.interview_mode,
-            "hiring_manager": instance.hiring_manager
+            "hiring_manager": instance.hiring_manager,
+            "number_of_openings": instance.number_of_openings,
+            "expected_start_date": instance.expected_start_date.strftime('%Y-%m-%d') if instance.expected_start_date else None,
+            "screening_questions": instance.screening_questions,
+            "health_insurance": instance.health_insurance,
+            "remote_work": instance.remote_work,
+            "paid_leave": instance.paid_leave,
+            "bonus": instance.bonus,
+            "date_posted": instance.date_posted.strftime('%Y-%m-%d') if instance.date_posted else None,
+            "job_status": instance.job_status
+
         })
     
     def list(self, request, *args, **kwargs):
