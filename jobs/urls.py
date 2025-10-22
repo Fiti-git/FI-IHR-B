@@ -21,6 +21,11 @@ job_posting_detail = JobPostingViewSet.as_view({
     'delete': 'destroy'
 })
 
+# Job manage view (returns jobs/applications/interviews/offers for a provider)
+job_posting_manage = JobPostingViewSet.as_view({
+    'get': 'job_manage'
+})
+
 # ===== JOB APPLICATION URLS =====
 job_application_list = JobApplicationViewSet.as_view({
     'get': 'list',
@@ -91,6 +96,10 @@ urlpatterns = [
     # PUT /api/job-posting/{job_id}/ - Update job posting
     # DELETE /api/job-posting/{job_id}/ - Delete job posting
     path('posting/<int:job_id>/', job_posting_detail, name='job-posting-detail'),
+
+    # ===== JOB MANAGE ENDPOINTS =====
+    # GET /api/job-posting/manage/ - Get jobs and related data for a job provider
+    path('manage/', job_posting_manage, name='job-manage'),
 
     # ===== JOB APPLICATION ENDPOINTS =====
     # POST /api/job-posting/applications/ - Apply to job

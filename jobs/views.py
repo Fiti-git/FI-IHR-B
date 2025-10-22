@@ -67,7 +67,8 @@ class JobPostingViewSet(viewsets.ModelViewSet):
             "paid_leave": instance.paid_leave,
             "bonus": instance.bonus,
             "date_posted": instance.date_posted.strftime('%Y-%m-%d') if instance.date_posted else None,
-            "job_status": instance.job_status
+            "job_status": instance.job_status,
+            
 
         })
     
@@ -102,6 +103,115 @@ class JobPostingViewSet(viewsets.ModelViewSet):
             })
         
         return Response({"jobs": jobs_list})
+
+    @action(detail=False, methods=['get'], url_path='job-manage')
+    def job_manage(self, request):
+        """GET /api/job-posting/job-manage?job_provider_id=ID - Return all jobs, applications, interviews and offers for a job provider"""
+        job_provider_id = request.query_params.get('job_provider_id') or request.query_params.get('provider_id')
+
+        # If not provided, try to infer from authenticated user's JobProviderProfile
+        if not job_provider_id and hasattr(request, 'user') and request.user and request.user.is_authenticated:
+            try:
+                from profiles.models import JobProviderProfile
+                profile = JobProviderProfile.objects.filter(user=request.user).first()
+                if profile:
+                    job_provider_id = profile.id
+            except Exception:
+                pass
+
+        if not job_provider_id:
+            return Response({"error": "job_provider_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Collect jobs for this provider
+        jobs_qs = JobPosting.objects.filter(job_provider_id=job_provider_id)
+
+        result_jobs = []
+        for job in jobs_qs:
+            job_dict = {
+                "job_id": job.id,
+                "job_title": job.job_title,
+                "department": job.department,
+                "job_type": job.job_type,
+                "work_location": job.work_location,
+                "work_mode": job.work_mode,
+                "role_overview": job.role_overview,
+                "key_responsibilities": job.key_responsibilities,
+                "required_qualifications": job.required_qualifications,
+                "preferred_qualifications": job.preferred_qualifications,
+                "languages_required": job.languages_required,
+                "job_category": job.job_category,
+                "salary_from": job.salary_from,
+                "salary_to": job.salary_to,
+                "currency": job.currency,
+                "application_deadline": job.application_deadline.strftime('%Y-%m-%d') if job.application_deadline else None,
+                "interview_mode": job.interview_mode,
+                "hiring_manager": job.hiring_manager,
+                "number_of_openings": job.number_of_openings,
+                "expected_start_date": job.expected_start_date.strftime('%Y-%m-%d') if job.expected_start_date else None,
+                "screening_questions": job.screening_questions,
+                "file_upload": job.file_upload,
+                "health_insurance": job.health_insurance,
+                "remote_work": job.remote_work,
+                "paid_leave": job.paid_leave,
+                "bonus": job.bonus,
+                "date_posted": job.date_posted.strftime('%Y-%m-%d %H:%M:%S') if job.date_posted else None,
+                "job_status": job.job_status,
+            }
+
+            # Applications for this job
+            applications_qs = JobApplication.objects.filter(job=job)
+            applications_list = []
+            for app in applications_qs:
+                app_dict = {
+                    "application_id": app.id,
+                    "freelancer_id": app.freelancer_id,
+                    "resume": app.resume,
+                    "cover_letter": app.cover_letter,
+                    "expected_rate": app.expected_rate,
+                    "status": app.status,
+                    "date_applied": app.date_applied.strftime('%Y-%m-%d %H:%M:%S') if app.date_applied else None,
+                    "rating": app.rating,
+                    "comments": app.comments,
+                }
+
+                # Interviews for this application
+                interviews_qs = JobInterview.objects.filter(application=app)
+                interviews_list = []
+                for iv in interviews_qs:
+                    interviews_list.append({
+                        "interview_id": iv.id,
+                        "interview_date": iv.interview_date.strftime('%Y-%m-%d %H:%M:%S') if iv.interview_date else None,
+                        "interview_mode": iv.interview_mode,
+                        "status": iv.status,
+                        "interview_link": iv.interview_link,
+                        "interview_notes": iv.interview_notes,
+                        "rating": iv.rating,
+                        "comments": iv.comments,
+                    })
+
+                # Offers for this application
+                offers_qs = JobOffer.objects.filter(application=app)
+                offers_list = []
+                for of in offers_qs:
+                    offers_list.append({
+                        "offer_id": of.id,
+                        "offer_status": of.offer_status,
+                        "offer_details": of.offer_details,
+                        "date_offered": of.date_offered.strftime('%Y-%m-%d %H:%M:%S') if of.date_offered else None,
+                        "date_accepted": of.date_accepted.strftime('%Y-%m-%d %H:%M:%S') if of.date_accepted else None,
+                        "date_rejected": of.date_rejected.strftime('%Y-%m-%d %H:%M:%S') if of.date_rejected else None,
+                    })
+
+                app_dict['interviews'] = interviews_list
+                app_dict['offers'] = offers_list
+
+                applications_list.append(app_dict)
+
+            job_dict['applications'] = applications_list
+
+            result_jobs.append(job_dict)
+
+        return Response({"job_provider_id": job_provider_id, "jobs": result_jobs})
     
     def update(self, request, *args, **kwargs):
         """PUT /api/job-posting/{job_id} - Update job posting"""
