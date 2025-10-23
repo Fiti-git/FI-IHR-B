@@ -56,6 +56,7 @@ urlpatterns = [
     path('api/support/', include('support.urls')),
     path('api/project/', include('project.urls')),
     # path('api/auth/', include('accounts.urls')),
+    path('api/profile/', include('profiles.urls')),
 
     # Login and Registration routes
     path('myapi/', include('myapi.urls')),

@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'myapi',
     'apps.chat',
     'user',
+    'profiles',
     'rest_framework.authtoken',
     'allauth',
     'allauth.account',
@@ -64,6 +65,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',
 ]
 
+<<<<<<< HEAD
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -75,6 +77,62 @@ REST_FRAMEWORK = {
     ],
 }
 
+=======
+SITE_ID = 1
+
+# AUTHENTICATION_BACKENDS = (
+#     'django.contrib.auth.backends.ModelBackend',
+#     'allauth.account.auth_backends.AuthenticationBackend',
+# )
+
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = False
+
+EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
+DEFAULT_FROM_EMAIL = "noreply@zomotopos.site"
+MAILGUN_REDIRECT_URL = os.getenv("MAILGUN_REDIRECT_URL")
+
+ANYMAIL = {
+    "MAILGUN_API_KEY": MAILGUN_REDIRECT_URL,
+    "MAILGUN_SENDER_DOMAIN": "zomotopos.site",
+}
+
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'rest_framework_simplejwt.authentication.JWTAuthentication',
+#     ),
+#     'DEFAULT_PERMISSION_CLASSES': (
+#         'rest_framework.permissions.IsAuthenticated',
+#     ),
+#  }
+
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_HTTPONLY': False, # allows JWT to be read by JS
+    # We will use a custom serializer to return user details upon login
+    'USER_DETAILS_SERIALIZER': 'myapi.serializers.UserDetailsSerializer',
+    # Custom Social Login View
+    'SOCIAL_LOGIN_SERIALIZER': 'myapi.serializers.CustomSocialLoginSerializer',
+    'VERIFY_EMAIL_SERIALIZER': 'myapi.serializers.CustomVerifyEmailSerializer',
+    'ACCOUNT_CONFIRM_EMAIL_URL': '/api/auth/registration/verify-email/?key={key}',
+}
+
+SOCIALACCOUNT_ADAPTER = 'myapi.adapter.CustomSocialAccountAdapter'
+
+LOGIN_REDIRECT_URL = '/auth/success/'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+
+SIMPLE_JWT = {
+     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+     'ROTATE_REFRESH_TOKENS': True,
+     'BLACKLIST_AFTER_ROTATION': True,
+ }
+>>>>>>> 73ba8fcb71e0e1e677c6186c4ff7c5d02feb9403
 
 MIDDLEWARE = [ 
     'django.middleware.security.SecurityMiddleware',
