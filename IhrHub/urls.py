@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include, re_path  # <-- add re_path here
 from rest_framework import permissions
 from .views import custom_swagger_ui
+from . import views
 # from rest_framework_simplejwt.views import (
 #     TokenObtainPairView,
 #     TokenRefreshView,
@@ -14,10 +15,7 @@ schema_view = get_schema_view(
     openapi.Info(
         title="IhrHub API",
         default_version='v1',
-        description="API documentation for IhrHub - Freelancer Platform with Project Management, Proposals, Milestones, Payments, and Feedback",
-        terms_of_service="https://www.ihrhub.com/terms/",
-        contact=openapi.Contact(email="contact@ihrhub.com"),
-        license=openapi.License(name="BSD License"),
+        description="API documentation for IhrHub",
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
@@ -58,6 +56,9 @@ urlpatterns = [
     # path('api/auth/', include('accounts.urls')),
     path('api/profile/', include('profiles.urls')),
 
+
     # Login and Registration routes
     path('myapi/', include('myapi.urls')),
+
+    path('api/user/<int:user_id>/roles/', views.get_user_roles, name='get_user_roles'),
 ]
