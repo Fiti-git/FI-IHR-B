@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.urls import path, include, re_path  # <-- add re_path here
 from rest_framework import permissions
 from .views import custom_swagger_ui
+from django.conf import settings
+from django.conf.urls.static import static
 # from rest_framework_simplejwt.views import (
 #     TokenObtainPairView,
 #     TokenRefreshView,
@@ -23,6 +25,8 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
     authentication_classes=[],  # optional
 )
+
+
 
 urlpatterns = [
     # path('', login_page, name='login_page'),
@@ -60,4 +64,8 @@ urlpatterns = [
 
     # Login and Registration routes
     path('myapi/', include('myapi.urls')),
+
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

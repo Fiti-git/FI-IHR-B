@@ -18,15 +18,26 @@ class ProjectTagSerializer(serializers.ModelSerializer):
 
 class ProjectSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    image_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Project
         fields = [
             'id', 'user', 'title', 'description', 'category', 
-            'budget', 'project_type', 'deadline', 'visibility', 'status',
+            'budget', 'project_type', 'deadline', 'visibility', 'status','image', 'image_url',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at', 'user']
+
+
+    def get_image_url(self, obj):
+        """Return full URL for image"""
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
     def create(self, validated_data):
         """Create project instance - user will be set by perform_create in view"""

@@ -33,7 +33,14 @@ class Project(models.Model):
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='open')  # Increased to 50
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+    image = models.ImageField(
+        upload_to='project_images/', 
+        null=True, 
+        blank=True,
+        help_text='Project cover image'
+    )
+
+
     class Meta:
         ordering = ['-created_at']
     
