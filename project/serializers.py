@@ -8,7 +8,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name']
-
+        ref_name = 'ProjectUserSerializer'  # 👈 add this line add by thanidu
 
 class ProjectTagSerializer(serializers.ModelSerializer):
     class Meta:
