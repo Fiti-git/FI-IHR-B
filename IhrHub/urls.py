@@ -2,44 +2,40 @@ from django.contrib import admin
 from django.urls import path, include, re_path  # <-- add re_path here
 from rest_framework import permissions
 from .views import custom_swagger_ui
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
 from django.conf import settings
 from django.conf.urls.static import static
+from . import views  # for get_user_roles
+
 # from rest_framework_simplejwt.views import (
 #     TokenObtainPairView,
 #     TokenRefreshView,
 # )
-from drf_yasg.views import get_schema_view
-from drf_yasg import openapi
 # from myapi.views import GoogleLogin, auth_success, login_page, EmailVerificationRedirectView
 
+# Swagger/OpenAPI schema setup
 schema_view = get_schema_view(
     openapi.Info(
         title="IhrHub API",
         default_version='v1',
-        description="API documentation for IhrHub - Freelancer Platform with Project Management, Proposals, Milestones, Payments, and Feedback",
-        terms_of_service="https://www.ihrhub.com/terms/",
-        contact=openapi.Contact(email="contact@ihrhub.com"),
-        license=openapi.License(name="BSD License"),
+        description="API documentation for IhrHub",
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
     authentication_classes=[],  # optional
 )
 
-
-
 urlpatterns = [
     # path('', login_page, name='login_page'),
     path('admin/', admin.site.urls),
+
+    # Authentication routes
     # path('api/auth/', include('dj_rest_auth.urls')),
     # path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
-    # path('api/', include('myapi.urls')),
     # path('accounts/', include('allauth.urls')),
     # path('api/auth/google/', GoogleLogin.as_view(), name='google_api_login'),
     # path('verify-email-redirect/', EmailVerificationRedirectView.as_view(), name='verify_email_redirect'),
-
-    # path('api/chat/', include('apps.chat.urls')),
-
     # path('auth/success/', auth_success, name='auth_success'),
 
     # JWT Auth endpoints
@@ -65,7 +61,10 @@ urlpatterns = [
     # Login and Registration routes
     path('myapi/', include('myapi.urls')),
 
+    # Custom route for user roles
+    path('api/user/<int:user_id>/roles/', views.get_user_roles, name='get_user_roles'),
 ]
 
+# Serve media files during development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
