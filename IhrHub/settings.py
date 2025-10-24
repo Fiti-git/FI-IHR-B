@@ -63,19 +63,63 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'anymail',
     'django.contrib.sites',
+    
 ]
 
-# REST Framework settings
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
+SITE_ID = 1
+
+# AUTHENTICATION_BACKENDS = (
+#     'django.contrib.auth.backends.ModelBackend',
+#     'allauth.account.auth_backends.AuthenticationBackend',
+# )
+
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = False
+
+EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
+DEFAULT_FROM_EMAIL = "noreply@zomotopos.site"
+MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
+
+ANYMAIL = {
+    "MAILGUN_API_KEY": MAILGUN_API_KEY,
+    "MAILGUN_SENDER_DOMAIN": "zomotopos.site",
 }
 
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'rest_framework_simplejwt.authentication.JWTAuthentication',
+#     ),
+#     'DEFAULT_PERMISSION_CLASSES': (
+#         'rest_framework.permissions.IsAuthenticated',
+#     ),
+#  }
+
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_HTTPONLY': False, # allows JWT to be read by JS
+    # We will use a custom serializer to return user details upon login
+    'USER_DETAILS_SERIALIZER': 'myapi.serializers.UserDetailsSerializer',
+    # Custom Social Login View
+    'SOCIAL_LOGIN_SERIALIZER': 'myapi.serializers.CustomSocialLoginSerializer',
+    'VERIFY_EMAIL_SERIALIZER': 'myapi.serializers.CustomVerifyEmailSerializer',
+    'ACCOUNT_CONFIRM_EMAIL_URL': '/api/auth/registration/verify-email/?key={key}',
+}
+
+SOCIALACCOUNT_ADAPTER = 'myapi.adapter.CustomSocialAccountAdapter'
+
+LOGIN_REDIRECT_URL = '/auth/success/'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+
+SIMPLE_JWT = {
+     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+     'ROTATE_REFRESH_TOKENS': True,
+     'BLACKLIST_AFTER_ROTATION': True,
+ }
 
 MIDDLEWARE = [ 
     'django.middleware.security.SecurityMiddleware',
@@ -86,7 +130,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "corsheaders.middleware.CorsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -104,8 +147,6 @@ CSRF_TRUSTED_ORIGINS  = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-
-
 
 ROOT_URLCONF = 'IhrHub.urls'
 print (f"DIRS': {[os.path.join(BASE_DIR, 'templates')]}")
@@ -214,6 +255,3 @@ LINKEDIN_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID")
 LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET")
 LINKEDIN_REDIRECT_URI = os.getenv("LINKEDIN_REDIRECT_URI")
 
-# Media files (uploads)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
