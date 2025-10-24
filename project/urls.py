@@ -1,27 +1,22 @@
-from django.urls import path
-from . import views
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import (
+    ProjectViewSet, ProposalViewSet, MilestoneViewSet,
+    MilestonePaymentViewSet, FeedbackViewSet, api_health_check
+)
+
+# Create a router and register our viewsets
+router = DefaultRouter()
+router.register(r'projects', ProjectViewSet, basename='project')
+router.register(r'proposals', ProposalViewSet, basename='proposal')
+router.register(r'milestones', MilestoneViewSet, basename='milestone')
+router.register(r'payments', MilestonePaymentViewSet, basename='payment')
+router.register(r'feedbacks', FeedbackViewSet, basename='feedback')
 
 urlpatterns = [
-    # Project URLs
-    path('projects/', views.project_list, name='project-list'),
-    path('projects/<int:pk>/', views.project_detail, name='project-detail'),
-    path('projects/<int:pk>/status/', views.project_update_status, name='project-status'),
+    # API Health Check endpoint
+    path('health/', api_health_check, name='project-api-health-check'),
     
-    # Proposal URLs
-    path('proposals/', views.proposal_list, name='proposal-list'),
-    path('proposals/<int:pk>/', views.proposal_detail, name='proposal-detail'),
-    path('proposals/<int:pk>/status/', views.proposal_update_status, name='proposal-status'),
-    
-    # Milestone URLs
-    path('milestones/', views.milestone_list, name='milestone-list'),
-    path('milestones/<int:pk>/', views.milestone_detail, name='milestone-detail'),
-    path('milestones/<int:pk>/complete/', views.milestone_complete, name='milestone-complete'),
-    
-    # Payment URLs
-    path('payments/', views.payment_list, name='payment-list'),
-    path('payments/<int:pk>/release/', views.payment_release, name='payment-release'),
-    
-    # Feedback URLs
-    path('feedback/', views.feedback_list, name='feedback-list'),
-    path('feedback/<int:pk>/', views.feedback_detail, name='feedback-detail'),
+    # Router URLs - all CRUD operations for each model
+    path('', include(router.urls)),
 ]

@@ -83,10 +83,10 @@ ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = False
 
 EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
 DEFAULT_FROM_EMAIL = "noreply@zomotopos.site"
-MAILGUN_REDIRECT_URL = os.getenv("MAILGUN_REDIRECT_URL")
+MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
 
 ANYMAIL = {
-    "MAILGUN_API_KEY": MAILGUN_REDIRECT_URL,
+    "MAILGUN_API_KEY": MAILGUN_API_KEY,
     "MAILGUN_SENDER_DOMAIN": "zomotopos.site",
 }
 
