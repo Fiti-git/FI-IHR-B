@@ -53,6 +53,11 @@ interview_detail = JobInterviewViewSet.as_view({
     'get': 'retrieve'
 })
 
+# GET /api/job-posting/interview/application/{application_id}/ - Get interview status and link by application
+interview_by_application = JobInterviewViewSet.as_view({
+    'get': 'get_by_application'
+})
+
 interview_feedback = JobInterviewViewSet.as_view({
     'post': 'provide_feedback'
 })
@@ -116,8 +121,11 @@ urlpatterns = [
     # POST /api/job-posting/interviews/schedule/ - Schedule interview
     path('interview/schedule/', interview_schedule, name='interview-schedule'),
     # GET /api/job-posting/interviews/{interview_id}/ - Get interview details
+    # GET /api/job-posting/interview/application/{application_id}/ - Get latest interview status and link for an application
     # PUT /api/job-posting/interviews/{interview_id}/ - Update interview
     path('interview/<int:interview_id>/', interview_detail, name='interview-detail'),
+    # GET /api/job-posting/interview/application/{application_id}/ - Get interview status/link by application
+    path('interview/application/<int:application_id>/', interview_by_application, name='interview-by-application'),
     # POST /api/job-posting/interviews/feedback/ - Provide interview feedback
     path('interview/feedback/', interview_feedback, name='interview-feedback'),
     # POST /api/job-posting/interviews/reschedule/ - Reschedule interview

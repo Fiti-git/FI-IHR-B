@@ -286,7 +286,8 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 "freelancer_name": f"Freelancer {app.freelancer_id}",  # Simplified
                 "resume_url": app.resume,
                 "cover_letter_url": app.cover_letter,
-                "status": app.status
+                "status": app.status,
+                "rating": app.rating
             })
         
         return Response({"applications": applications_list})
@@ -403,6 +404,23 @@ class JobInterviewViewSet(viewsets.ModelViewSet):
             "interview_mode": instance.interview_mode,
             "interview_link": instance.interview_link,
             "interview_notes": instance.interview_notes
+        })
+
+    @action(detail=False, methods=['get'], url_path='application/(?P<application_id>[0-9]+)')
+    def get_by_application(self, request, application_id=None):
+        """GET /api/job-interview/application/{application_id} - Return latest interview status and link for an application"""
+        interviews = JobInterview.objects.filter(application_id=application_id)
+        if not interviews.exists():
+            return Response({"error": "Interview not found for the given application_id"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Return the most recent interview (by interview_date)
+        interview = interviews.order_by('-interview_date').first()
+        return Response({
+            "application_id": application_id,
+            "status": interview.status,
+            "interview_link": interview.interview_link,
+            "interview_date": interview.interview_date.strftime('%Y-%m-%dT%H:%M:%SZ') if interview.interview_date else None,
+            "interview_mode": interview.interview_mode
         })
     
     @action(detail=False, methods=['post'], url_path='feedback')
