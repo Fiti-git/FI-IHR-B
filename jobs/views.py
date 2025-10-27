@@ -420,7 +420,8 @@ class JobInterviewViewSet(viewsets.ModelViewSet):
             "status": interview.status,
             "interview_link": interview.interview_link,
             "interview_date": interview.interview_date.strftime('%Y-%m-%dT%H:%M:%SZ') if interview.interview_date else None,
-            "interview_mode": interview.interview_mode
+            "interview_mode": interview.interview_mode,
+            "interview_notes": interview.interview_notes
         })
     
     @action(detail=False, methods=['post'], url_path='feedback')
