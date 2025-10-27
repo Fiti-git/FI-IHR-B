@@ -249,21 +249,19 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             # Get job_id from validated data and remove it
             job_id = serializer.validated_data.pop('job_id')
-            
+
             try:
                 job = JobPosting.objects.get(id=job_id)
             except JobPosting.DoesNotExist:
-                return Response(
-                    {"error": "Job posting not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
+                return Response({"error": "Job posting not found"}, status=status.HTTP_404_NOT_FOUND)
+
             # Create the application manually to ensure proper field handling
             application = JobApplication.objects.create(
                 job=job,
-                freelancer_id=serializer.validated_data['freelancer_id'],
-                resume=serializer.validated_data['resume'],
-                cover_letter=serializer.validated_data['cover_letter'],
+                freelancer_id=serializer.validated_data.get('freelancer_id'),
+                resume=serializer.validated_data.get('resume'),
+                cover_letter=serializer.validated_data.get('cover_letter'),
+                expected_rate=serializer.validated_data.get('expected_rate')
             )
             
             return Response({

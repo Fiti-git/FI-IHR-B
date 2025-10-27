@@ -23,7 +23,8 @@ class JobApplicationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = JobApplication
-        fields = '__all__'
+        # Exclude the foreign key 'job' — API clients should send job_id instead
+        exclude = [ 'expected_rate', 'status', 'rating', 'comments']
 
 
 class JobApplicationUpdateSerializer(serializers.Serializer):
