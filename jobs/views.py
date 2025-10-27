@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from drf_yasg.utils import swagger_auto_schema
 from django.db import models
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -216,6 +217,9 @@ class JobPostingViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         """PUT /api/job-posting/{job_id} - Update job posting"""
         partial = kwargs.pop('partial', False)
+        # Require job_status to be provided for updates
+        if 'job_status' not in request.data:
+            return Response({"error": "job_status is required for update"}, status=status.HTTP_400_BAD_REQUEST)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         if serializer.is_valid():
@@ -313,6 +317,7 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
             "comments": application.comments
         })
     
+    @swagger_auto_schema(request_body=JobApplicationUpdateSerializer)
     @action(detail=True, methods=['put'], url_path='update', serializer_class=JobApplicationUpdateSerializer)
     def update_application_status(self, request, application_id=None):
         """PUT /api/job-application/update/{application_id} - Update application status and rating"""

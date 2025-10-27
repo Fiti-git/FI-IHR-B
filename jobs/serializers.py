@@ -11,7 +11,9 @@ class JobPostingSerializer(serializers.ModelSerializer):
     class Meta:
         model = JobPosting
         exclude = ['job_provider']
-        read_only_fields = ['job_status']
+        # Allow job_status to be writable so updates can change it
+        # (validation for required-on-update is performed in the view)
+        read_only_fields = []
 
 
 class JobApplicationSerializer(serializers.ModelSerializer):
