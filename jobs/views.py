@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from .models import JobPosting, JobApplication, JobInterview, JobOffer, ApplicationWithdrawal
 from .serializers import (
     JobPostingSerializer, JobApplicationSerializer, JobApplicationUpdateSerializer,
-    JobInterviewSerializer, JobOfferSerializer,
+    JobInterviewSerializer, JobOfferSerializer, JobOfferCreateSerializer,
     ApplicationWithdrawalSerializer
 )
 
@@ -475,36 +475,39 @@ class JobOfferViewSet(viewsets.ModelViewSet):
     queryset = JobOffer.objects.all()
     serializer_class = JobOfferSerializer
     
+    @swagger_auto_schema(request_body=JobOfferCreateSerializer, responses={201: JobOfferSerializer()})
     @action(detail=False, methods=['post'], url_path='create')
     def create_offer(self, request):
         """POST /api/job-offer/create - Create a job offer"""
-        application_id = request.data.get('application_id')
-        offer_status = request.data.get('offer_status', 'Pending')
-        
-        if not application_id:
-            return Response(
-                {"error": "application_id is required"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
+        # Validate input using JobOfferCreateSerializer so Swagger shows fields
+        serializer = JobOfferCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated = serializer.validated_data
+        application_id = validated.get('application_id')
+        offer_status = validated.get('offer_status', 'Pending')
+        offer_details = validated.get('offer_details')
+
         try:
             application = JobApplication.objects.get(id=application_id)
         except JobApplication.DoesNotExist:
-            return Response(
-                {"error": "Job application not found"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-            
-            # Create the job offer
-            offer = JobOffer.objects.create(
-                application=application,
-                offer_status=offer_status
-            )
-            
-            return Response({
-                "offer_id": offer.id,
-                "message": "Job offer created successfully"
-            }, status=status.HTTP_201_CREATED)
+            return Response({"error": "Job application not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # store offer_details as JSON string in the TextField
+        import json
+        offer_details_text = json.dumps(offer_details)
+
+        offer = JobOffer.objects.create(
+            application=application,
+            offer_status=offer_status,
+            offer_details=offer_details_text
+        )
+
+        return Response({
+            "offer_id": offer.id,
+            "message": "Job offer created successfully"
+        }, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['post'], url_path='accept')
     def accept_offer(self, request):
