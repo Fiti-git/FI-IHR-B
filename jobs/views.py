@@ -607,3 +607,49 @@ def get_jobs_for_freelancer(request, freelance_id):
     jobs_list = list(jobs_map.values())
 
     return Response({"freelance_id": freelance_id, "jobs": jobs_list})
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_interviews_by_job(request, job_id):
+    """GET /api/interview/{job_id} - Return interviews for a job, filtered by access token
+
+    Response: { "interviews": [ {interview_date, interview_mode, status, interview_notes}, ... ] }
+    Filtering rules:
+      - If the user is a Freelancer (has FreelancerProfile), only return interviews where freelancer_id matches their profile id
+      - If the user is a Job Provider (has JobProviderProfile), only return interviews for jobs owned by that provider
+      - Otherwise, default to no data (empty list)
+    """
+    interviews_qs = JobInterview.objects.filter(job_id=job_id)
+
+    try:
+        from profiles.models import FreelancerProfile, JobProviderProfile
+
+        if hasattr(request, 'user') and request.user and request.user.is_authenticated:
+            # Check for freelancer role
+            freelancer_profile = FreelancerProfile.objects.filter(user=request.user).first()
+            if freelancer_profile:
+                interviews_qs = interviews_qs.filter(freelancer_id=freelancer_profile.id)
+            else:
+                # Check for job provider role
+                provider_profile = JobProviderProfile.objects.filter(user=request.user).first()
+                if provider_profile:
+                    interviews_qs = interviews_qs.filter(job__job_provider=provider_profile)
+                else:
+                    # Authenticated but no matching role; return empty
+                    interviews_qs = interviews_qs.none()
+    except Exception:
+        # On any error resolving profiles, return empty to avoid leaking data
+        interviews_qs = interviews_qs.none()
+
+    interviews_list = []
+    for iv in interviews_qs.order_by('-interview_date'):
+        interviews_list.append({
+            "interview_date": iv.interview_date.strftime('%Y-%m-%dT%H:%M:%SZ') if iv.interview_date else None,
+            "interview_mode": iv.interview_mode,
+            "status": iv.status,
+            "interview_notes": iv.interview_notes,
+            "interview_link": iv.interview_link,
+        })
+
+    return Response({"interviews": interviews_list})
