@@ -254,6 +254,24 @@ class JobInterview(models.Model):
         related_name='interviews',
         help_text="Foreign key to job_application.id"
     )
+
+    # Additional linkage fields
+    # Foreign key reference to job_posting.id (named 'job' so the DB column is 'job_id')
+    job = models.ForeignKey(
+        JobPosting,
+        on_delete=models.CASCADE,
+        related_name='job_interviews',
+        blank=True,
+        null=True,
+        help_text="Foreign key to job_posting.id"
+    )
+
+    # Reference to freelancer_profile.id (stored as integer for consistency with JobApplication)
+    freelancer_id = models.IntegerField(
+        blank=True,
+        null=True,
+        help_text="Foreign key to freelancer_profile.id"
+    )
     
     # Column 3: interview_date
     interview_date = models.DateTimeField(

@@ -64,11 +64,13 @@ class JobInterviewSerializer(serializers.ModelSerializer):
     Simplified JobInterview serializer - common fields only
     """
     application_id = serializers.IntegerField(write_only=True)
+    job_id = serializers.IntegerField(write_only=True)
+    freelance_id = serializers.IntegerField(write_only=True)
     date_time = serializers.DateTimeField(source='interview_date', write_only=True)
     
     class Meta:
         model = JobInterview
-        fields = ['application_id', 'date_time', 'interview_mode', 'interview_link', 'interview_notes', 'id', 'interview_date', 'status', 'rating']
+        fields = ['application_id', 'job_id', 'freelance_id', 'date_time', 'interview_mode', 'interview_link', 'interview_notes', 'id', 'interview_date', 'status', 'rating']
         read_only_fields = ['id', 'interview_date', 'status', 'rating']
 
 

@@ -298,6 +298,7 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
 
             applications_list.append({
                 "application_id": app.id,
+                "freelance_id": app.freelancer_id,
                 "freelancer_name": freelancer_name,
                 "resume_url": app.resume,
                 "cover_letter_url": app.cover_letter,
@@ -384,6 +385,8 @@ class JobInterviewViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             # Get application_id from validated data and remove it
             application_id = serializer.validated_data.pop('application_id')
+            job_id = serializer.validated_data.get('job_id')
+            freelance_id = serializer.validated_data.get('freelance_id')
             
             try:
                 application = JobApplication.objects.get(id=application_id)
@@ -392,10 +395,25 @@ class JobInterviewViewSet(viewsets.ModelViewSet):
                     {"error": "Job application not found"}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
+
+            # Validate provided job_id and freelance_id match the application
+            if not job_id or not freelance_id:
+                return Response(
+                    {"error": "job_id and freelance_id are required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if int(job_id) != int(application.job_id) or int(freelance_id) != int(application.freelancer_id):
+                return Response(
+                    {"error": "job_id or freelance_id does not match the application"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             # Create the interview manually to ensure proper field handling
             interview = JobInterview.objects.create(
                 application=application,
+                # Populate new denormalized fields for convenience/queries
+                job=application.job,
+                freelancer_id=application.freelancer_id,
                 interview_date=serializer.validated_data['interview_date'],
                 interview_mode=serializer.validated_data['interview_mode'],
                 interview_link=serializer.validated_data.get('interview_link', ''),
