@@ -13,6 +13,9 @@ from .serializers import (
     ApplicationWithdrawalSerializer
 )
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework import permissions
+
 class JobPostingViewSet(viewsets.ModelViewSet):
     queryset = JobPosting.objects.all()
     serializer_class = JobPostingSerializer
@@ -559,3 +562,30 @@ class JobOfferViewSet(viewsets.ModelViewSet):
 class ApplicationWithdrawalViewSet(viewsets.ModelViewSet):
     queryset = ApplicationWithdrawal.objects.all()
     serializer_class = ApplicationWithdrawalSerializer
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_jobs_for_freelancer(request, freelance_id):
+    """GET /api/freelance/{freelance_id} - Return jobs related to a freelancer.
+
+    Response: list of jobs with fields: job_id, job_title, job_category, date_posted, job_status
+    """
+    # Find applications by this freelancer id
+    applications = JobApplication.objects.filter(freelancer_id=freelance_id).select_related('job')
+
+    jobs_map = {}
+    for app in applications:
+        job = app.job
+        if job and job.id not in jobs_map:
+            jobs_map[job.id] = {
+                "job_id": job.id,
+                "job_title": job.job_title,
+                "job_category": job.job_category,
+                "date_posted": job.date_posted.strftime('%Y-%m-%d') if job.date_posted else None,
+                "job_status": job.job_status,
+            }
+
+    jobs_list = list(jobs_map.values())
+
+    return Response({"freelance_id": freelance_id, "jobs": jobs_list})
