@@ -281,9 +281,21 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         
         applications_list = []
         for app in applications:
+            # Try to resolve freelancer name from profiles.FreelancerProfile if available
+            try:
+                from profiles.models import FreelancerProfile
+                profile = FreelancerProfile.objects.filter(id=app.freelancer_id).select_related('user').first()
+                if profile:
+                    freelancer_name = profile.full_name or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
+                else:
+                    freelancer_name = f"Freelancer {app.freelancer_id}"
+            except Exception:
+                # Fall back to the numeric id if any error occurs
+                freelancer_name = f"Freelancer {app.freelancer_id}"
+
             applications_list.append({
                 "application_id": app.id,
-                "freelancer_name": f"Freelancer {app.freelancer_id}",  # Simplified
+                "freelancer_name": freelancer_name,
                 "resume_url": app.resume,
                 "cover_letter_url": app.cover_letter,
                 "status": app.status,
