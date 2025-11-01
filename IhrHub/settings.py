@@ -128,27 +128,31 @@ SIMPLE_JWT = {
 MIDDLEWARE = [ 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+     'corsheaders.middleware.CorsMiddleware',  # <-
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    "corsheaders.middleware.CorsMiddleware",
+    
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://192.168.1.7:3000",
     "http://localhost:3000",
-    "http://127.0.0.1:3000"
+    "http://127.0.0.1:3000",
+    "http://206.189.134.117"
 ]
 
 CSRF_TRUSTED_ORIGINS  = [
     "http://localhost:5173",
     "http://192.168.1.7:3000",
     "http://localhost:3000",
-    "http://127.0.0.1:3000"
+    "http://127.0.0.1:3000",
+    "http://206.189.134.117"
+    
 ]
 
 CORS_ALLOW_CREDENTIALS = True
