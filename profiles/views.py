@@ -4,6 +4,7 @@ from .serializers import FreelancerProfileSerializer, JobProviderProfileSerializ
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import Http404
+from rest_framework.permissions import IsAuthenticated
 
 class FreelancerProfileView(APIView):
     """
@@ -128,3 +129,25 @@ class JobProviderProfileView(APIView):
                 {"error": "Profile not found. Use POST method to create one."},
                 status=status.HTTP_404_NOT_FOUND
             )
+        
+class CheckAuthView(APIView):
+    """
+    An endpoint to check if a user is authenticated and to return their roles.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        """
+        Handles the GET request to check authentication and retrieve user roles.
+        """
+        user = request.user
+        # Retrieve the names of all groups the user belongs to
+        roles = [group.name for group in user.groups.all()]
+
+        user_details = {
+            'isAuthenticated': True,
+            'username': user.username,
+            'email': user.email,
+            'roles': roles
+        }
+        return Response(user_details)
