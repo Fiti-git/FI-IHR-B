@@ -34,7 +34,8 @@ SECRET_KEY = 'django-insecure-@n#1)ra@2u%0ive72f166h@@b#7dw(cv+u2u3-y90srw-vm4)q
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+
 
 
 # Application definition
@@ -54,7 +55,7 @@ INSTALLED_APPS = [
     'myapi',
     'apps.chat',
     'user',
-    'jobs',  # Added jobs app
+    'jobs',  
     'profiles',
     'rest_framework.authtoken',
     'allauth',
