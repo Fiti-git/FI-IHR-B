@@ -1,29 +1,45 @@
+# Core Django + ASGI
 asgiref==3.9.1
 Django==4.2.23
-django-cors-headers==4.7.0
-django-filter==25.1
-djangorestframework==3.16.0
-djangorestframework_simplejwt==5.5.1
-drf-yasg==1.21.10
-inflection==0.5.1
-packaging==25.0
-psycopg2-binary==2.9.10
-PyJWT==2.10.1
-pytz==2025.2
-PyYAML==6.0.2
 sqlparse==0.5.3
 tzdata==2025.2
+pytz==2025.2
+
+# REST framework + Auth
+djangorestframework==3.16.0
+django-filter==25.1
+djangorestframework-simplejwt==5.5.1
+dj-rest-auth
+django-allauth
+
+# API Documentation
+drf-yasg==1.21.10
+inflection==0.5.1
 uritemplate==4.2.0
-python-dotenv>=0.19.0
+PyYAML==6.0.2
+
+# Security / OAuth / Google Login
+cryptography
 google-auth>=2.0.0
 google-auth-oauthlib>=0.4.0
 google-auth-httplib2>=0.1.0
 requests>=2.25.0
-django-allauth
-dj-rest-auth
-djangorestframework-simplejwt
+
+# Email + UUID fields
 django-anymail
 django-shortuuidfield
-cryptography
+
+# CORS + ENV + Images + Storage
+django-cors-headers==4.7.0
+python-dotenv>=0.19.0
 Pillow
 boto3
+
+# PostgreSQL
+psycopg2-binary==2.9.10
+
+# Server (Gunicorn)
+gunicorn
+
+# Utility
+packaging==25.0
