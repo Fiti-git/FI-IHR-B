@@ -24,3 +24,6 @@ dj-rest-auth
 djangorestframework-simplejwt
 django-anymail
 django-shortuuidfield
+cryptography
+Pillow
+boto3
