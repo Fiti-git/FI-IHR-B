@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'myapi',
     'apps.chat',
     'user',
+    'jobs',  # Added jobs app
     'profiles',
     'rest_framework.authtoken',
     'allauth',
@@ -127,6 +128,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "corsheaders.middleware.CorsMiddleware",
@@ -177,7 +179,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'IHRDB',
         'USER': 'postgres',
-        'PASSWORD': 'Admin',
+        'PASSWORD': 'admin123',
         'HOST': 'localhost',
         'PORT': '5432',
     }

@@ -7,6 +7,7 @@ from drf_yasg import openapi
 from django.conf import settings
 from django.conf.urls.static import static
 from . import views  # for get_user_roles
+from jobs.views import get_jobs_for_freelancer, get_interviews_by_job
 
 # from rest_framework_simplejwt.views import (
 #     TokenObtainPairView,
@@ -55,6 +56,7 @@ urlpatterns = [
     # App routes
     path('api/support/', include('support.urls')),
     path('api/project/', include('project.urls')),
+    path('api/job-', include('jobs.urls')),  # Job posting and related endpoints
     # path('api/auth/', include('accounts.urls')),
     path('api/profile/', include('profiles.urls')),
 
@@ -63,6 +65,10 @@ urlpatterns = [
 
     # Custom route for user roles
     path('api/user/<int:user_id>/roles/', views.get_user_roles, name='get_user_roles'),
+    # GET /api/freelance/{freelance_id}/ - Jobs related to a freelancer
+    path('api/freelance/<int:freelance_id>/', get_jobs_for_freelancer, name='freelance-jobs'),
+    # GET /api/interview/{job_id} - Interviews for a job filtered by access token
+    path('api/interview/<int:job_id>/', get_interviews_by_job, name='interviews-by-job'),
 ]
 
 # Serve media files during development
