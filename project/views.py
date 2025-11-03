@@ -7,12 +7,38 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.contrib.auth.models import User
 from rest_framework.exceptions import PermissionDenied
+from django.utils import timezone
 
 from .models import Project, Proposal, Milestone, MilestonePayment, Feedback, ProjectTag
 from .serializers import (
     ProjectSerializer, ProposalSerializer, MilestoneSerializer,
     MilestonePaymentSerializer, FeedbackSerializer, ProjectTagSerializer
 )
+
+
+def get_user_profile_type(user):
+    """
+    Helper function to determine user profile type
+    Returns: 'freelancer', 'job-provider', or None
+    """
+    # Import models here to avoid circular imports
+    from profiles.models import FreelancerProfile, JobProviderProfile
+    
+    # Check if user has freelancer profile
+    try:
+        FreelancerProfile.objects.get(user=user)
+        return 'freelancer'
+    except FreelancerProfile.DoesNotExist:
+        pass
+    
+    # Check if user has job provider profile
+    try:
+        JobProviderProfile.objects.get(user=user)
+        return 'job-provider'
+    except JobProviderProfile.DoesNotExist:
+        pass
+    
+    return None
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -22,6 +48,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
     
     List and Retrieve: Anyone can access (AllowAny)
     Create, Update, Delete: Authentication required (IsAuthenticated)
+    
+    IMPORTANT: Only Job Providers can create projects, NOT Freelancers
     """
     queryset = Project.objects.all().select_related('user').order_by('-created_at')
     serializer_class = ProjectSerializer
@@ -40,7 +68,28 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """
         Create project with authenticated user
+        ONLY JOB PROVIDERS CAN CREATE PROJECTS - FREELANCERS ARE BLOCKED
         """
+        user = self.request.user
+        profile_type = get_user_profile_type(user)
+        
+        print(f"DEBUG: User: {user.username}, Profile Type: {profile_type}")
+        
+        # Block freelancers
+        if profile_type == 'freelancer':
+            raise PermissionDenied(
+                "Freelancers cannot create projects. Only job providers can create projects. "
+                "Freelancers can only submit proposals for existing projects."
+            )
+        
+        # Require job provider profile
+        if profile_type != 'job-provider':
+            raise PermissionDenied(
+                "You must have a job provider profile to create projects. "
+                "Please complete your profile setup."
+            )
+        
+        # All checks passed - create the project
         serializer.save(user=self.request.user)
     
     def perform_update(self, serializer):
@@ -154,6 +203,8 @@ class ProposalViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing proposals.
     Freelancers can submit proposals for projects.
+    
+    IMPORTANT: Only Freelancers can submit proposals, NOT Job Providers
     """
     queryset = Proposal.objects.all().select_related('freelancer', 'project').order_by('-submitted_at')
     serializer_class = ProposalSerializer
@@ -171,8 +222,69 @@ class ProposalViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
     
     def perform_create(self, serializer):
-        """Create proposal with authenticated user as freelancer"""
+        """
+        Create proposal with authenticated user as freelancer
+        ONLY FREELANCERS CAN SUBMIT PROPOSALS - JOB PROVIDERS ARE BLOCKED
+        """
+        user = self.request.user
+        profile_type = get_user_profile_type(user)
+        
+        print(f"DEBUG: User: {user.username}, Profile Type: {profile_type}")
+        
+        # Block job providers
+        if profile_type == 'job-provider':
+            raise PermissionDenied(
+                "Job providers cannot submit proposals. Only freelancers can submit proposals. "
+                "Job providers can only create projects and review proposals."
+            )
+        
+        # Require freelancer profile
+        if profile_type != 'freelancer':
+            raise PermissionDenied(
+                "You must have a freelancer profile to submit proposals. "
+                "Please complete your profile setup."
+            )
+        
+        # Check if freelancer already submitted a proposal for this project
+        project = serializer.validated_data.get('project')
+        existing_proposal = Proposal.objects.filter(
+            project=project,
+            freelancer=user
+        ).first()
+        
+        if existing_proposal:
+            raise PermissionDenied(
+                "You have already submitted a proposal for this project. "
+                "You can edit your existing proposal instead."
+            )
+        
         serializer.save(freelancer=self.request.user)
+    
+    def perform_update(self, serializer):
+        """
+        Update proposal - ensure user owns the proposal
+        """
+        proposal = self.get_object()
+        if proposal.freelancer != self.request.user:
+            raise PermissionDenied("You don't have permission to edit this proposal")
+        
+        # Don't allow editing accepted or rejected proposals
+        if proposal.status in ['accepted', 'rejected']:
+            raise PermissionDenied(f"Cannot edit {proposal.status} proposals")
+        
+        serializer.save()
+    
+    def perform_destroy(self, instance):
+        """
+        Delete proposal - ensure user owns the proposal and it's pending
+        """
+        if instance.freelancer != self.request.user:
+            raise PermissionDenied("You don't have permission to delete this proposal")
+        
+        if instance.status != 'pending':
+            raise PermissionDenied("Can only delete pending proposals")
+        
+        instance.delete()
     
     def get_queryset(self):
         """Filter proposals based on query parameters"""
@@ -244,6 +356,7 @@ class ProposalViewSet(viewsets.ModelViewSet):
 class MilestoneViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing milestones.
+    Only freelancers with accepted proposals can create milestones.
     """
     queryset = Milestone.objects.all().select_related('freelancer', 'project').order_by('-created_at')
     serializer_class = MilestoneSerializer
@@ -259,6 +372,52 @@ class MilestoneViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+    
+    def perform_create(self, serializer):
+        """
+        Create milestone - only freelancers with accepted proposals can create
+        Auto-assign the authenticated user as the freelancer
+        """
+        project = serializer.validated_data.get('project')
+        
+        # Check if user is the project owner
+        if project.user == self.request.user:
+            raise PermissionDenied("Project owners cannot create milestones. Only assigned freelancers can.")
+        
+        # Check if the user has an accepted proposal for this project
+        accepted_proposal = Proposal.objects.filter(
+            project=project,
+            freelancer=self.request.user,
+            status='accepted'
+        ).first()
+        
+        if not accepted_proposal:
+            raise PermissionDenied("You do not have an accepted proposal for this project")
+        
+        # Auto-assign the authenticated user as the freelancer
+        serializer.save(freelancer=self.request.user)
+    
+    def perform_update(self, serializer):
+        """
+        Update milestone - ensure user is the assigned freelancer or project owner
+        """
+        milestone = self.get_object()
+        if milestone.freelancer != self.request.user and milestone.project.user != self.request.user:
+            raise PermissionDenied("You don't have permission to edit this milestone")
+        serializer.save()
+    
+    def perform_destroy(self, instance):
+        """
+        Delete milestone - ensure user is the assigned freelancer or project owner
+        """
+        if instance.freelancer != self.request.user and instance.project.user != self.request.user:
+            raise PermissionDenied("You don't have permission to delete this milestone")
+        
+        # Don't allow deletion of approved milestones
+        if instance.status == 'approved':
+            raise PermissionDenied("Cannot delete approved milestones")
+        
+        instance.delete()
     
     def get_queryset(self):
         """Filter milestones based on query parameters"""
@@ -281,6 +440,83 @@ class MilestoneViewSet(viewsets.ModelViewSet):
         
         return queryset
     
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def verify_freelancer_access(self, request):
+        """
+        Verify if the authenticated user is a freelancer with an accepted proposal
+        for the specified project.
+        """
+        project_id = request.query_params.get('project_id', None)
+        
+        if not project_id:
+            return Response(
+                {'error': 'project_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            project = Project.objects.get(id=project_id)
+        except Project.DoesNotExist:
+            return Response(
+                {'error': 'Project not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if user is the project owner (client)
+        if project.user == request.user:
+            return Response(
+                {
+                    'has_access': False,
+                    'error': 'Project owners cannot create milestones. Only assigned freelancers can.',
+                    'is_project_owner': True
+                }, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if the user has an accepted proposal for this project
+        accepted_proposal = Proposal.objects.filter(
+            project=project,
+            freelancer=request.user,
+            status='accepted'
+        ).first()
+        
+        if not accepted_proposal:
+            return Response(
+                {
+                    'has_access': False,
+                    'error': 'You do not have an accepted proposal for this project',
+                    'is_project_owner': False
+                }, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return Response({
+            'has_access': True,
+            'project_id': project.id,
+            'project_name': project.title,
+            'proposal_id': accepted_proposal.id,
+            'freelancer_id': request.user.id,
+            'freelancer_username': request.user.username,
+            'is_project_owner': False
+        })
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def my_milestones(self, request):
+        """Get all milestones for the authenticated freelancer"""
+        milestones = self.get_queryset().filter(freelancer=request.user)
+        
+        # Filter by project if specified
+        project_id = request.query_params.get('project_id', None)
+        if project_id:
+            milestones = milestones.filter(project_id=project_id)
+        
+        page = self.paginate_queryset(milestones)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(milestones, many=True)
+        return Response(serializer.data)
+    
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def complete(self, request, pk=None):
         """Mark milestone as completed - only freelancer can mark as complete"""
@@ -293,6 +529,13 @@ class MilestoneViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # Check if milestone is in progress
+        if milestone.status != 'in_progress':
+            return Response(
+                {'error': 'Only milestones in progress can be marked as completed'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         milestone.status = 'completed'
         milestone.save()
         serializer = self.get_serializer(milestone)
@@ -300,7 +543,12 @@ class MilestoneViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def approve(self, request, pk=None):
-        """Approve a completed milestone - only project owner can approve"""
+        """
+        Approve a milestone - only project owner can approve
+        Two scenarios:
+        1. Approve milestone setup (pending -> approved)
+        2. Approve completed work (completed -> approved/paid)
+        """
         milestone = self.get_object()
         
         # Check if user owns the project
@@ -310,16 +558,33 @@ class MilestoneViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        if milestone.status != 'completed':
+        # Scenario 1: Approve milestone setup (pending -> approved)
+        if milestone.status == 'pending':
+            milestone.status = 'approved'
+            milestone.save()
+            serializer = self.get_serializer(milestone)
+            return Response({
+                'message': 'Milestone setup approved successfully. Freelancer can now start working.',
+                'milestone': serializer.data
+            })
+        
+        # Scenario 2: Approve completed work (completed -> approved)
+        elif milestone.status == 'completed':
+            milestone.status = 'approved'
+            milestone.save()
+            serializer = self.get_serializer(milestone)
+            return Response({
+                'message': 'Milestone work approved successfully. You can now create payment.',
+                'milestone': serializer.data
+            })
+        
+        else:
             return Response(
-                {'error': 'Milestone must be completed before approval'}, 
+                {
+                    'error': f'Milestone with status "{milestone.status}" cannot be approved. Only pending or completed milestones can be approved.'
+                }, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        milestone.status = 'approved'
-        milestone.save()
-        serializer = self.get_serializer(milestone)
-        return Response(serializer.data)
 
 
 class MilestonePaymentViewSet(viewsets.ModelViewSet):
@@ -340,6 +605,18 @@ class MilestonePaymentViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+    
+    def perform_create(self, serializer):
+        """
+        Create payment - only project owner can create payments
+        """
+        project = serializer.validated_data.get('project')
+        
+        # Check if user owns the project
+        if project.user != self.request.user:
+            raise PermissionDenied("Only project owner can create payments")
+        
+        serializer.save()
     
     def get_queryset(self):
         """Filter payments based on query parameters"""
@@ -370,8 +647,6 @@ class MilestonePaymentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def release_payment(self, request, pk=None):
         """Release payment to freelancer - only project owner can release"""
-        from django.utils import timezone
-        
         payment = self.get_object()
         
         # Check if user owns the project
@@ -390,8 +665,17 @@ class MilestonePaymentViewSet(viewsets.ModelViewSet):
         payment.payment_status = 'released'
         payment.released_at = timezone.now()
         payment.save()
+        
+        # Update milestone status to 'paid'
+        if payment.milestone:
+            payment.milestone.status = 'paid'
+            payment.milestone.save()
+        
         serializer = self.get_serializer(payment)
-        return Response(serializer.data)
+        return Response({
+            'message': 'Payment released successfully!',
+            'payment': serializer.data
+        })
 
 
 class FeedbackViewSet(viewsets.ModelViewSet):
@@ -483,11 +767,12 @@ def api_health_check(request):
         'message': 'Freelancer API is running successfully!',
         'version': '1.0.0',
         'timestamp': timezone.now().isoformat(),
+        'authenticated_user': request.user.username if request.user.is_authenticated else 'Anonymous',
         'endpoints': {
-            'projects': '/api/projects/',
-            'proposals': '/api/proposals/',
-            'milestones': '/api/milestones/',
-            'payments': '/api/payments/',
-            'feedbacks': '/api/feedbacks/',
+            'projects': '/api/project/projects/',
+            'proposals': '/api/project/proposals/',
+            'milestones': '/api/project/milestones/',
+            'payments': '/api/project/payments/',
+            'feedbacks': '/api/project/feedbacks/',
         }
     }, status=status.HTTP_200_OK)
