@@ -59,6 +59,7 @@ urlpatterns = [
     path('api/job-', include('jobs.urls')),  # Job posting and related endpoints
     # path('api/auth/', include('accounts.urls')),
     path('api/profile/', include('profiles.urls')),
+    # path('api/profiles/', include('profiles.urls')), #added by thanidu
 
     # Login and Registration routes
     path('myapi/', include('myapi.urls')),
