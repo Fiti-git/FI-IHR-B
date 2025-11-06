@@ -15,6 +15,7 @@ from .serializers import (
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import permissions
+from profiles.models import FreelancerProfile
 
 class JobPostingViewSet(viewsets.ModelViewSet):
     queryset = JobPosting.objects.all()
@@ -314,104 +315,37 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         
     #     return Response({"applications": applications_list})
 
-@action(detail=False, methods=['get'], url_path='job/(?P<job_id>[0-9]+)')
-def get_applications_for_job(self, request, job_id=None):
-    """GET /api/job-application/job/{job_id} - Fetch applications for a job"""
-    from profiles.models import FreelancerProfile
+    @action(detail=False, methods=['get'], url_path=r'job/(?P<job_id>[0-9]+)')
+    def get_applications_for_job(self, request, job_id=None):
+        """GET /api/job-application/job/{job_id} - Fetch applications for a job"""
+        applications = self.queryset.filter(job_id=job_id)
+        applications_list = []
 
-    applications = self.queryset.filter(job_id=job_id).select_related(None)
-
-    applications_list = []
-    for app in applications:
-        try:
-            # Match FreelancerProfile.user_id with job_application.freelancer_id
-            profile = FreelancerProfile.objects.select_related('user').filter(user_id=app.freelancer_id).first()
-
-            if profile:
-                freelancer_name = (
-                    profile.full_name
-                    or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
-                )
-            else:
+        for app in applications:
+            try:
+                # Correct: freelancer_id = user_id in profile table
+                profile = FreelancerProfile.objects.select_related('user').filter(user_id=app.freelancer_id).first()
+                if profile:
+                    freelancer_name = (
+                        profile.full_name
+                        or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
+                    )
+                else:
+                    freelancer_name = f"Freelancer {app.freelancer_id}"
+            except Exception:
                 freelancer_name = f"Freelancer {app.freelancer_id}"
 
-        except Exception as e:
-            # Fall back to the numeric id if any error occurs
-            freelancer_name = f"Freelancer {app.freelancer_id}"
-
-        applications_list.append({
-            "application_id": app.id,
-            "freelancer_id": app.freelancer_id,
-            "freelancer_name": freelancer_name,
-            "resume_url": app.resume,
-            "cover_letter_url": app.cover_letter,
-            "status": app.status,
-            "rating": app.rating,
-        })
+            applications_list.append({
+                "application_id": app.id,
+                "freelancer_id": app.freelancer_id,
+                "freelancer_name": freelancer_name,
+                "resume_url": app.resume,
+                "cover_letter_url": app.cover_letter,
+                "status": app.status,
+                "rating": app.rating,
+            })
 
         return Response({"applications": applications_list})
-
-    
-    @action(detail=True, methods=['post'], url_path='review')
-    def review_application(self, request, application_id=None):
-        """POST /api/job-application/review/{application_id} - Review and rate application"""
-        application = self.get_object()
-        
-        rating = request.data.get('rating')
-        status_value = request.data.get('status')
-        comments = request.data.get('comments')
-        
-        if rating:
-            application.rating = rating
-        if status_value:
-            application.status = status_value
-        if comments:
-            application.comments = comments
-        
-        application.save()
-        
-        return Response({
-            "message": "Application reviewed and rated successfully",
-            "application_id": application.id,
-            "status": application.status,
-            "rating": application.rating,
-            "comments": application.comments
-        })
-    
-    @swagger_auto_schema(request_body=JobApplicationUpdateSerializer)
-    @action(detail=True, methods=['put'], url_path='update', serializer_class=JobApplicationUpdateSerializer)
-    def update_application_status(self, request, application_id=None):
-        """PUT /api/job-application/update/{application_id} - Update application status and rating"""
-        application = self.get_object()
-        
-        # Use the dedicated update serializer for validation
-        serializer = JobApplicationUpdateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get validated data
-        status_value = serializer.validated_data.get('status')
-        rating = serializer.validated_data.get('rating')
-        comments = serializer.validated_data.get('comments')
-        
-        # Update application with provided data
-        if status_value:
-            application.status = status_value
-        if rating is not None:
-            application.rating = rating
-        if comments is not None:
-            application.comments = comments
-        
-        application.save()
-        
-        return Response({
-            "message": "Application status and rating updated successfully",
-            "application_id": application.id,
-            "status": application.status,
-            "rating": application.rating,
-            "comments": application.comments
-        })
-
 
 class JobInterviewViewSet(viewsets.ModelViewSet):
     """
