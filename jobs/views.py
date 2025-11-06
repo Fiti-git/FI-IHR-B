@@ -21,7 +21,13 @@ class JobPostingViewSet(viewsets.ModelViewSet):
     serializer_class = JobPostingSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'job_id'
-    permission_classes = [permissions.IsAuthenticated]  # Add authentication requirement
+    permission_classes = [permissions.IsAuthenticated]  # default; overridden per action below
+
+    def get_permissions(self):
+        """Allow public access to list/retrieve; require auth for mutations."""
+        if getattr(self, 'action', None) in ['list', 'retrieve']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
     
     def create(self, request, *args, **kwargs):
         """POST /api/job-posting - Create job posting"""
