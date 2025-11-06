@@ -349,7 +349,7 @@ def get_applications_for_job(self, request, job_id=None):
             "rating": app.rating,
         })
 
-    return Response({"applications": applications_list})
+        return Response({"applications": applications_list})
 
     
     @action(detail=True, methods=['post'], url_path='review')
