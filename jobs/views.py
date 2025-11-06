@@ -283,36 +283,74 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=False, methods=['get'], url_path='job/(?P<job_id>[0-9]+)')
-    def get_applications_for_job(self, request, job_id=None):
-        """GET /api/job-application/job/{job_id} - Fetch applications for a job"""
-        applications = self.queryset.filter(job_id=job_id)
+    # @action(detail=False, methods=['get'], url_path='job/(?P<job_id>[0-9]+)')
+    # def get_applications_for_job(self, request, job_id=None):
+    #     """GET /api/job-application/job/{job_id} - Fetch applications for a job"""
+    #     applications = self.queryset.filter(job_id=job_id)
         
-        applications_list = []
-        for app in applications:
-            # Try to resolve freelancer name from profiles.FreelancerProfile if available
-            try:
-                from profiles.models import FreelancerProfile
-                profile = FreelancerProfile.objects.filter(id=app.freelancer_id).select_related('user').first()
-                if profile:
-                    freelancer_name = profile.full_name or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
-                else:
-                    freelancer_name = f"Freelancer {app.freelancer_id}"
-            except Exception:
-                # Fall back to the numeric id if any error occurs
+    #     applications_list = []
+    #     for app in applications:
+    #         # Try to resolve freelancer name from profiles.FreelancerProfile if available
+    #         try:
+    #             from profiles.models import FreelancerProfile
+    #             profile = FreelancerProfile.objects.filter(id=app.freelancer_id).select_related('user').first()
+    #             if profile:
+    #                 freelancer_name = profile.full_name or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
+    #             else:
+    #                 freelancer_name = f"Freelancer {app.freelancer_id}"
+    #         except Exception:
+    #             # Fall back to the numeric id if any error occurs
+    #             freelancer_name = f"Freelancer {app.freelancer_id}"
+
+    #         applications_list.append({
+    #             "application_id": app.id,
+    #             "freelance_id": app.freelancer_id,
+    #             "freelancer_name": freelancer_name,
+    #             "resume_url": app.resume,
+    #             "cover_letter_url": app.cover_letter,
+    #             "status": app.status,
+    #             "rating": app.rating
+    #         })
+        
+    #     return Response({"applications": applications_list})
+
+@action(detail=False, methods=['get'], url_path='job/(?P<job_id>[0-9]+)')
+def get_applications_for_job(self, request, job_id=None):
+    """GET /api/job-application/job/{job_id} - Fetch applications for a job"""
+    from profiles.models import FreelancerProfile
+
+    applications = self.queryset.filter(job_id=job_id).select_related(None)
+
+    applications_list = []
+    for app in applications:
+        try:
+            # Match FreelancerProfile.user_id with job_application.freelancer_id
+            profile = FreelancerProfile.objects.select_related('user').filter(user_id=app.freelancer_id).first()
+
+            if profile:
+                freelancer_name = (
+                    profile.full_name
+                    or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
+                )
+            else:
                 freelancer_name = f"Freelancer {app.freelancer_id}"
 
-            applications_list.append({
-                "application_id": app.id,
-                "freelance_id": app.freelancer_id,
-                "freelancer_name": freelancer_name,
-                "resume_url": app.resume,
-                "cover_letter_url": app.cover_letter,
-                "status": app.status,
-                "rating": app.rating
-            })
-        
-        return Response({"applications": applications_list})
+        except Exception as e:
+            # Fall back to the numeric id if any error occurs
+            freelancer_name = f"Freelancer {app.freelancer_id}"
+
+        applications_list.append({
+            "application_id": app.id,
+            "freelancer_id": app.freelancer_id,
+            "freelancer_name": freelancer_name,
+            "resume_url": app.resume,
+            "cover_letter_url": app.cover_letter,
+            "status": app.status,
+            "rating": app.rating,
+        })
+
+    return Response({"applications": applications_list})
+
     
     @action(detail=True, methods=['post'], url_path='review')
     def review_application(self, request, application_id=None):
