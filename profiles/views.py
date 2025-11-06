@@ -1,37 +1,171 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
 from .models import FreelancerProfile, JobProviderProfile
 from .serializers import FreelancerProfileSerializer, JobProviderProfileSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.http import Http404
+from rest_framework.permissions import IsAuthenticated
 
-class FreelancerProfileViewSet(viewsets.ModelViewSet):
+class FreelancerProfileView(APIView):
     """
-    A viewset for viewing and editing the profile of the currently authenticated user.
+    View to retrieve, create, or update the user's freelancer profile.
     """
-    serializer_class = FreelancerProfileSerializer
-    # 1. Add permissions to ensure the user is logged in.
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FreelancerProfileSerializer
 
-    # 2. Override get_queryset to filter profiles by the current user.
-    def get_queryset(self):
-        """
-        This view should return a list of all the profiles
-        for the currently authenticated user.
-        """
-        return FreelancerProfile.objects.filter(user=self.request.user)
+    def get_object(self, user):
+        try:
+            return FreelancerProfile.objects.get(user=user)
+        except FreelancerProfile.DoesNotExist:
+            raise Http404
 
-    # 3. Override perform_create to automatically set the user on creation.
-    def perform_create(self, serializer):
+    def get(self, request, *args, **kwargs):
+        """ Retrieve the user's profile. """
+        try:
+            profile = self.get_object(request.user)
+            serializer = self.serializer_class(profile)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Http404:
+            # A new user won't have a profile, return empty data
+            return Response({}, status=status.HTTP_200_OK)
+
+    def post(self, request, *args, **kwargs):
+        """ Create a new profile for the user. """
+        if FreelancerProfile.objects.filter(user=request.user).exists():
+            return Response(
+                {"error": "Profile already exists. Use PUT to update."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, *args, **kwargs):
+        """ Update the user's existing profile. """
+        try:
+            profile = self.get_object(request.user)
+            serializer = self.serializer_class(profile, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Http404:
+            return Response(
+                {"error": "Profile not found. Use POST to create one."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def list(self, request, *args, **kwargs):
         """
-        Assign the current user to the profile when it is created.
+        Override list to return the user's profile directly or 404 if not exists
         """
-        serializer.save(user=self.request.user)
+        try:
+            profile = FreelancerProfile.objects.get(user=request.user)
+            serializer = self.get_serializer(profile)
+            return Response(serializer.data)
+        except FreelancerProfile.DoesNotExist:
+            return Response(
+                {
+                    'detail': 'Freelancer profile not found',
+                    'user_type': 'freelancer',
+                    'profile_exists': False
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
-class JobProviderProfileViewSet(viewsets.ModelViewSet):
+class JobProviderProfileView(APIView):
+    """
+    View to retrieve, create, or update the user's job provider profile.
+    * Requires token authentication.
+    * A user can only access their own profile.
+    """
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = JobProviderProfileSerializer
-    # permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        return JobProviderProfile.objects.filter(user=self.request.user)
+    def get_object(self, user):
+        """
+        Helper method to get the profile for the current user.
+        Handles the case where the profile does not exist.
+        """
+        try:
+            return JobProviderProfile.objects.get(user=user)
+        except JobProviderProfile.DoesNotExist:
+            raise Http404
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+    def get(self, request, *args, **kwargs):
+        """
+        Retrieve the user's profile.
+        """
+        try:
+            profile = self.get_object(request.user)
+            serializer = self.serializer_class(profile)
+            # We return the single object directly, not in a list
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Http404:
+            # It's okay if the profile doesn't exist yet, just return nothing
+            return Response({}, status=status.HTTP_200_OK)
+
+
+    def post(self, request, *args, **kwargs):
+        """
+        Create a new profile for the user.
+        This should only work if they don't already have one.
+        """
+        if JobProviderProfile.objects.filter(user=request.user).exists():
+            return Response(
+                {"error": "Profile already exists. Use PUT method to update."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            # Associate the profile with the currently logged-in user
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+    def put(self, request, *args, **kwargs):
+        """
+        Update the user's existing profile.
+        """
+        try:
+            profile = self.get_object(request.user)
+            # The 'partial=True' argument allows for PATCH-like behavior,
+            # meaning not all fields are required for an update.
+            serializer = self.serializer_class(profile, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Http404:
+            return Response(
+                {"error": "Profile not found. Use POST method to create one."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+class CheckAuthView(APIView):
+    """
+    An endpoint to check if a user is authenticated and to return their roles.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        """
+        Handles the GET request to check authentication and retrieve user roles.
+        """
+        user = request.user
+        # Retrieve the names of all groups the user belongs to
+        roles = [group.name for group in user.groups.all()]
+
+        user_details = {
+            'isAuthenticated': True,
+            'username': user.username,
+            'email': user.email,
+            'roles': roles
+        }
+        return Response(user_details)

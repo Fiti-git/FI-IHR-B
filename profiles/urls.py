@@ -1,11 +1,17 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import FreelancerProfileViewSet, JobProviderProfileViewSet
+# Import the new APIView, not the old ViewSet
+from .views import FreelancerProfileView, JobProviderProfileView, CheckAuthView
 
+# The router is now empty or only contains other ViewSets
 router = DefaultRouter()
-router.register(r'freelancer', FreelancerProfileViewSet, basename='freelancer-profile')
-router.register(r'job-provider', JobProviderProfileViewSet, basename='jobprovider-profile')
+# router.register(...) # Register other viewsets if you have them
 
 urlpatterns = [
     path('', include(router.urls)),
+    # Add the path for the job provider profile
+    path('job-provider/', JobProviderProfileView.as_view(), name='job-provider-profile'),
+    # Add the new path for the freelancer profile
+    path('freelancer/', FreelancerProfileView.as_view(), name='freelancer-profile'),
+    path('check-auth/', CheckAuthView.as_view(), name='check-auth'),
 ]
