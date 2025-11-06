@@ -321,32 +321,41 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         applications = self.queryset.filter(job_id=job_id)
         applications_list = []
 
-        for app in applications:
-            try:
-                # Correct: freelancer_id = user_id in profile table
-                profile = FreelancerProfile.objects.select_related('user').filter(user_id=app.freelancer_id).first()
-                if profile:
-                    freelancer_name = (
-                        profile.full_name
-                        or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
-                    )
-                else:
-                    freelancer_name = f"Freelancer {app.freelancer_id}"
-            except Exception:
-                freelancer_name = f"Freelancer {app.freelancer_id}"
+        # Fetch the job posting & employer user id
+        job_posting = JobPosting.objects.select_related('job_provider').filter(id=job_id).first()
+        employer_user_id = None
+        if job_posting and job_posting.job_provider:
+            # job_provider = JobProviderProfile
+            employer_user_id = job_posting.job_provider.user_id
 
+        for app in applications:
+            # Get freelancer profile and name
+            profile = FreelancerProfile.objects.select_related('user').filter(user_id=app.freelancer_id).first()
+            if profile:
+                freelancer_name = (
+                    profile.full_name
+                    or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
+                )
+                freelancer_user_id = profile.user_id
+            else:
+                freelancer_name = f"Freelancer {app.freelancer_id}"
+                freelancer_user_id = app.freelancer_id  # fallback (since freelancer_id = auth_user_id)
+
+            # Add each application entry
             applications_list.append({
                 "application_id": app.id,
                 "freelancer_id": app.freelancer_id,
+                "freelancer_user_id": freelancer_user_id,
                 "freelancer_name": freelancer_name,
+                "employer_user_id": employer_user_id,
                 "resume_url": app.resume,
                 "cover_letter_url": app.cover_letter,
                 "status": app.status,
                 "rating": app.rating,
+                "chat_users": [freelancer_user_id, employer_user_id] if employer_user_id else [freelancer_user_id],
             })
 
         return Response({"applications": applications_list})
-
 class JobInterviewViewSet(viewsets.ModelViewSet):
     """
     Simplified JobInterview ViewSet following the example pattern
