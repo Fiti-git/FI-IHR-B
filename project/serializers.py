@@ -86,16 +86,21 @@ class ProposalSerializer(serializers.ModelSerializer):
     freelancer = UserSerializer(read_only=True)
     freelancer_id = serializers.IntegerField(write_only=True, required=False)
     project_title = serializers.CharField(source='project.title', read_only=True)
-    
+
+    # 👇 Add this new field for chat participants
+    chat = serializers.SerializerMethodField()
+
     class Meta:
         model = Proposal
         fields = [
             'id', 'project', 'project_title', 'freelancer', 'freelancer_id',
-            'budget', 'cover_letter', 'status', 'submitted_at', 'updated_at'
+            'budget', 'cover_letter', 'status', 'submitted_at', 'updated_at',
+            'chat',  # include here
         ]
         read_only_fields = ['submitted_at', 'updated_at']
-    
+
     def create(self, validated_data):
+        """Attach freelancer automatically if not provided"""
         if 'freelancer_id' not in validated_data:
             validated_data['freelancer'] = self.context['request'].user
         else:
@@ -108,12 +113,25 @@ class ProposalSerializer(serializers.ModelSerializer):
         if value.status != 'open':
             raise serializers.ValidationError("Cannot submit proposal for a closed project")
         return value
-    
+
     def validate_budget(self, value):
         """Validate budget is greater than zero"""
         if value <= 0:
             raise serializers.ValidationError("Budget must be greater than zero")
         return value
+
+    def get_chat(self, obj):
+        """
+        Return [freelancer_user_id, job_provider_user_id]
+        Both are from the auth User table.
+        """
+        try:
+            freelancer_id = obj.freelancer.id  # User table
+            job_provider_id = obj.project.user.id  # User table
+            return [freelancer_id, job_provider_id]
+        except Exception as e:
+            # fallback if something is missing
+            return []
 
 
 class MilestoneSerializer(serializers.ModelSerializer):
