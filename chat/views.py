@@ -78,10 +78,10 @@ class SendMessageView(APIView):
 
     def post(self, request):
         conversation_id = request.data.get("conversation_id")
-        content = request.data.get("content")
+        text = request.data.get("text")  # ✅ renamed for consistency
 
-        if not conversation_id or not content:
-            return Response({"error": "conversation_id and content are required"},
+        if not conversation_id or not text:
+            return Response({"error": "conversation_id and text are required"},
                             status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -89,18 +89,15 @@ class SendMessageView(APIView):
         except Conversation.DoesNotExist:
             return Response({"error": "Conversation not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # ✅ Ensure sender is a participant
         if not conversation.participants.filter(id=request.user.id).exists():
             return Response({"error": "You are not a participant in this conversation."},
                             status=status.HTTP_403_FORBIDDEN)
 
-        # Create and serialize message
         message = Message.objects.create(
             conversation=conversation,
             sender=request.user,
-            text=request.data.get('text')
+            text=text
         )
-
 
         serializer = MessageSerializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
