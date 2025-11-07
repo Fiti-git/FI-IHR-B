@@ -98,8 +98,9 @@ class SendMessageView(APIView):
         message = Message.objects.create(
             conversation=conversation,
             sender=request.user,
-            text=content  # <-- use text instead of content
+            text=request.data.get('text')
         )
+
 
         serializer = MessageSerializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
