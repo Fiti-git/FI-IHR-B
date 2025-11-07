@@ -69,6 +69,9 @@ urlpatterns = [
     path('api/freelance/<int:freelance_id>/', get_jobs_for_freelancer, name='freelance-jobs'),
     # GET /api/interview/{job_id} - Interviews for a job filtered by access token
     path('api/interview/<int:job_id>/', get_interviews_by_job, name='interviews-by-job'),
+
+    #chat app
+    path('api/chat/', include('chat.urls')),
 ]
 
 # Serve media files during development

@@ -66,6 +66,8 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'anymail',
     'django.contrib.sites',
+    'chat',
+    'channels',
     
     
 ]
