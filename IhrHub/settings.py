@@ -188,8 +188,8 @@ WSGI_APPLICATION = 'IhrHub.wsgi.application'
 #         'ENGINE': 'django.db.backends.postgresql',
 #         'NAME': 'IHRDB',
 #         'USER': 'postgres',
-#         'PASSWORD': 'admin123',
-#         'HOST': 'localhost',
+#         'PASSWORD': 'Admin',
+#         'HOST': '127.0.0.1',
 #         'PORT': '5432',
 #     }
 # }
