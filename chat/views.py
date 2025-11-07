@@ -98,7 +98,7 @@ class SendMessageView(APIView):
         message = Message.objects.create(
             conversation=conversation,
             sender=request.user,
-            content=content
+            text=content  # <-- use text instead of content
         )
 
         serializer = MessageSerializer(message)
