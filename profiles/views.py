@@ -4,14 +4,18 @@ from .serializers import FreelancerProfileSerializer, JobProviderProfileSerializ
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.http import Http404
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
 
 class FreelancerProfileView(APIView):
     """
     View to retrieve, create, or update the user's freelancer profile.
+    REQUIRES AUTHENTICATION - for managing own profile
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     serializer_class = FreelancerProfileSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_object(self, user):
         try:
@@ -23,11 +27,17 @@ class FreelancerProfileView(APIView):
         """ Retrieve the user's profile. """
         try:
             profile = self.get_object(request.user)
-            serializer = self.serializer_class(profile)
+            serializer = self.serializer_class(profile, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Http404:
-            # A new user won't have a profile, return empty data
-            return Response({}, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    'detail': 'Freelancer profile not found',
+                    'user_type': 'not_freelancer',
+                    'profile_exists': False
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
 
     def post(self, request, *args, **kwargs):
         """ Create a new profile for the user. """
@@ -37,7 +47,7 @@ class FreelancerProfileView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save(user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -47,7 +57,12 @@ class FreelancerProfileView(APIView):
         """ Update the user's existing profile. """
         try:
             profile = self.get_object(request.user)
-            serializer = self.serializer_class(profile, data=request.data, partial=True)
+            serializer = self.serializer_class(
+                profile, 
+                data=request.data, 
+                partial=True,
+                context={'request': request}
+            )
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
@@ -58,39 +73,17 @@ class FreelancerProfileView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-    def list(self, request, *args, **kwargs):
-        """
-        Override list to return the user's profile directly or 404 if not exists
-        """
-        try:
-            profile = FreelancerProfile.objects.get(user=request.user)
-            serializer = self.get_serializer(profile)
-            return Response(serializer.data)
-        except FreelancerProfile.DoesNotExist:
-            return Response(
-                {
-                    'detail': 'Freelancer profile not found',
-                    'user_type': 'freelancer',
-                    'profile_exists': False
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
-
 
 class JobProviderProfileView(APIView):
     """
     View to retrieve, create, or update the user's job provider profile.
-    * Requires token authentication.
-    * A user can only access their own profile.
+    REQUIRES AUTHENTICATION - for managing own profile
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     serializer_class = JobProviderProfileSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_object(self, user):
-        """
-        Helper method to get the profile for the current user.
-        Handles the case where the profile does not exist.
-        """
         try:
             return JobProviderProfile.objects.get(user=user)
         except JobProviderProfile.DoesNotExist:
@@ -98,22 +91,25 @@ class JobProviderProfileView(APIView):
 
     def get(self, request, *args, **kwargs):
         """
-        Retrieve the user's profile.
+        Retrieve the authenticated user's profile.
         """
         try:
             profile = self.get_object(request.user)
-            serializer = self.serializer_class(profile)
-            # We return the single object directly, not in a list
+            serializer = self.serializer_class(profile, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Http404:
-            # It's okay if the profile doesn't exist yet, just return nothing
-            return Response({}, status=status.HTTP_200_OK)
-
+            return Response(
+                {
+                    'detail': 'Job provider profile not found',
+                    'user_type': 'not_job_provider',
+                    'profile_exists': False
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
 
     def post(self, request, *args, **kwargs):
         """
         Create a new profile for the user.
-        This should only work if they don't already have one.
         """
         if JobProviderProfile.objects.filter(user=request.user).exists():
             return Response(
@@ -121,13 +117,11 @@ class JobProviderProfileView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={'request': request})
         if serializer.is_valid():
-            # Associate the profile with the currently logged-in user
             serializer.save(user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
     def put(self, request, *args, **kwargs):
         """
@@ -135,9 +129,12 @@ class JobProviderProfileView(APIView):
         """
         try:
             profile = self.get_object(request.user)
-            # The 'partial=True' argument allows for PATCH-like behavior,
-            # meaning not all fields are required for an update.
-            serializer = self.serializer_class(profile, data=request.data, partial=True)
+            serializer = self.serializer_class(
+                profile, 
+                data=request.data, 
+                partial=True,
+                context={'request': request}
+            )
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
@@ -147,25 +144,71 @@ class JobProviderProfileView(APIView):
                 {"error": "Profile not found. Use POST method to create one."},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
-class CheckAuthView(APIView):
+
+
+# ============ PUBLIC LISTING VIEWS ============
+class JobProviderListView(APIView):
     """
-    An endpoint to check if a user is authenticated and to return their roles.
+    PUBLIC view to retrieve all job provider profiles.
+    NO AUTHENTICATION REQUIRED - for public listing page
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+    serializer_class = JobProviderProfileSerializer
 
     def get(self, request, *args, **kwargs):
         """
-        Handles the GET request to check authentication and retrieve user roles.
+        Retrieve all job provider profiles for public viewing.
         """
-        user = request.user
-        # Retrieve the names of all groups the user belongs to
-        roles = [group.name for group in user.groups.all()]
+        profiles = JobProviderProfile.objects.all()
+        serializer = self.serializer_class(profiles, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        user_details = {
+
+class FreelancerListView(APIView):
+    """
+    PUBLIC view to retrieve all freelancer profiles.
+    NO AUTHENTICATION REQUIRED - for public listing page
+    """
+    permission_classes = [AllowAny]
+    serializer_class = FreelancerProfileSerializer
+
+    def get(self, request, *args, **kwargs):
+        """
+        Retrieve all freelancer profiles for public viewing.
+        """
+        profiles = FreelancerProfile.objects.all()
+        serializer = self.serializer_class(profiles, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+# ============================================
+
+
+class CheckAuthView(APIView):
+    """
+    PUBLIC endpoint to check if a user is authenticated.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({
+                'isAuthenticated': False,
+                'username': None,
+                'email': None,
+                'roles': [],
+                'is_freelancer': False,
+                'is_job_provider': False
+            })
+        
+        user = request.user
+        roles = [group.name for group in user.groups.all()]
+        is_freelancer = FreelancerProfile.objects.filter(user=user).exists()
+        is_job_provider = JobProviderProfile.objects.filter(user=user).exists()
+
+        return Response({
             'isAuthenticated': True,
             'username': user.username,
             'email': user.email,
-            'roles': roles
-        }
-        return Response(user_details)
+            'roles': roles,
+            'is_freelancer': is_freelancer,
+            'is_job_provider': is_job_provider
+        })

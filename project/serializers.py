@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Project, Proposal, Milestone, MilestonePayment, Feedback, ProjectTag
 from django.utils import timezone
-
+from profiles.models import JobProviderProfile
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,17 +19,24 @@ class ProjectTagSerializer(serializers.ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     image_url = serializers.SerializerMethodField()
+    company_name = serializers.SerializerMethodField()
     
     class Meta:
         model = Project
         fields = [
             'id', 'user', 'title', 'description', 'category', 
             'budget', 'project_type', 'deadline', 'visibility', 'status','image', 'image_url',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at', 'company_name'
         ]
         read_only_fields = ['created_at', 'updated_at', 'user']
 
-
+    def get_company_name(self, obj):
+        try:
+            profile = JobProviderProfile.objects.get(user=obj.user)
+            return profile.company_name
+        except JobProviderProfile.DoesNotExist:
+            return None
+        
     def get_image_url(self, obj):
         """Return full URL for image"""
         if obj.image:
