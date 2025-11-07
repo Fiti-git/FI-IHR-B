@@ -165,8 +165,8 @@ class JobApplication(models.Model):
     # Column 3: freelancer_id (Foreign key to freelancer_profile.id)
     freelancer_id = models.IntegerField(help_text="Foreign key to freelancer_profile.id")
     
-    # Column 4: resume
-    resume = models.URLField(help_text="URL to the freelancer's resume")
+    # Column 4: resume (store uploaded resume file)
+    resume = models.FileField(upload_to='resumes/', blank=True, null=True, help_text="Resume file upload")
     
     # Column 5: cover_letter
     cover_letter = models.TextField(help_text="Cover letter submitted by freelancer")
