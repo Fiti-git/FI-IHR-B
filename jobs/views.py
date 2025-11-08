@@ -329,8 +329,8 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
 
     # ✅ New method to fix your error
     @action(detail=True, methods=['put'], url_path='update')
-    def update_application_status(self, request, id=None):
-        """PUT /api/job-application/update/{id}/ - Update application status or rating"""
+    def update_application_status(self, request, application_id=None):
+        """PUT /api/job-application/update/{application_id}/ - Update application status or rating"""
         try:
             application = self.get_object()
         except JobApplication.DoesNotExist:
