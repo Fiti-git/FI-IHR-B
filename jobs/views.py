@@ -13,7 +13,7 @@ from .serializers import (
     ApplicationWithdrawalSerializer
 )
 
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import permissions
@@ -259,8 +259,7 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
     serializer_class = JobApplicationSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'application_id'
-    # Allow form/multipart uploads so clients can POST files for the resume field
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
     
     def create(self, request, *args, **kwargs):
         """POST /api/job-application - Apply to job"""
