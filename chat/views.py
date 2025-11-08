@@ -16,6 +16,7 @@ class StartConversationView(APIView):
 
     def post(self, request):
         other_user_id = request.data.get("user_id")
+
         if not other_user_id:
             return Response(
                 {"error": "user_id is required"},
@@ -30,22 +31,24 @@ class StartConversationView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Prevent starting chat with self
         if other_user == request.user:
             return Response(
                 {"error": "You cannot start a chat with yourself."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # ✅ Generate deterministic pair_key
+        # ✅ Deterministic pair key — ensures only one room per pair
         pair_key = Conversation.get_pair_key(request.user.id, other_user.id)
 
-        # ✅ Get or create conversation safely (no IntegrityError)
+        # ✅ get_or_create prevents duplicate conversations
         conversation, created = Conversation.objects.get_or_create(pair_key=pair_key)
-        conversation.participants.add(request.user, other_user)
+
+        # ✅ Only add participants if not already linked
+        if created or conversation.participants.count() < 2:
+            conversation.participants.add(request.user, other_user)
 
         serializer = ConversationSerializer(conversation)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 # 🔹 Pagination for messages
 class MessagePagination(PageNumberPagination):
@@ -80,7 +83,7 @@ class SendMessageView(APIView):
 
     def post(self, request):
         conversation_id = request.data.get("conversation_id")
-        text = request.data.get("text")  # ✅ renamed for consistency
+        text = request.data.get("text")
 
         if not conversation_id or not text:
             return Response({"error": "conversation_id and text are required"},
@@ -103,3 +106,13 @@ class SendMessageView(APIView):
 
         serializer = MessageSerializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+# 🟢 NEW: List all conversations for the authenticated user
+class ConversationListView(generics.ListAPIView):
+    serializer_class = ConversationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Return all conversations where the requesting user is a participant
+        return Conversation.objects.filter(participants=self.request.user).order_by('-updated_at')

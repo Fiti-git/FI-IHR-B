@@ -14,7 +14,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
         self.room_group_name = f"chat_{self.conversation_id}"
 
-        # Join the room group
+        # ✅ Join the room group
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
@@ -38,10 +38,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not message or not user_id:
             return
 
-        # Save message to DB
+        # ✅ Save message to DB
         new_message = await self.save_message(user_id, self.conversation_id, message)
 
-        # Serialize and send to room
+        # ✅ Serialize and send to room
         serialized = MessageSerializer(new_message).data
 
         await self.channel_layer.group_send(
@@ -57,8 +57,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event["message"]))
 
     @database_sync_to_async
-    def save_message(self, user_id, conversation_id, content):
+    def save_message(self, user_id, conversation_id, text):
         """Save message to DB"""
         user = User.objects.get(id=user_id)
         conversation = Conversation.objects.get(id=conversation_id)
-        return Message.objects.create(conversation=conversation, sender=user, content=content)
+        return Message.objects.create(conversation=conversation, sender=user, text=text)
