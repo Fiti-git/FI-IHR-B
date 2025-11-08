@@ -11,39 +11,41 @@ from .serializers import ConversationSerializer, MessageSerializer
 User = get_user_model()
 
 
-# 🔹 Start or get conversation between two users
 class StartConversationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         other_user_id = request.data.get("user_id")
         if not other_user_id:
-            return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "user_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             other_user = User.objects.get(id=other_user_id)
         except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "User not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         # Prevent starting chat with self
         if other_user == request.user:
-            return Response({"error": "You cannot start a chat with yourself."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "You cannot start a chat with yourself."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Check for existing conversation
-        conversation = (
-            Conversation.objects
-            .filter(participants=request.user)
-            .filter(participants=other_user)
-            .first()
-        )
+        # ✅ Generate deterministic pair_key
+        pair_key = Conversation.get_pair_key(request.user.id, other_user.id)
 
-        if not conversation:
-            conversation = Conversation.objects.create()
-            conversation.participants.add(request.user, other_user)
+        # ✅ Get or create conversation safely (no IntegrityError)
+        conversation, created = Conversation.objects.get_or_create(pair_key=pair_key)
+        conversation.participants.add(request.user, other_user)
 
         serializer = ConversationSerializer(conversation)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 # 🔹 Pagination for messages
 class MessagePagination(PageNumberPagination):
