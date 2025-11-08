@@ -53,7 +53,6 @@ INSTALLED_APPS = [
     'support',
     'project',
     'myapi',
-    'apps.chat',
     'user',
     'jobs',  
     'profiles',
@@ -66,6 +65,8 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'anymail',
     'django.contrib.sites',
+    'chat',
+    'channels',
     
     
 ]
@@ -192,6 +193,19 @@ WSGI_APPLICATION = 'IhrHub.wsgi.application'
 #     }
 # }
 
+# Asfaks  DATABASE CONFIGURATION USING ENV VARIABLES
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'IHRDB',
+#         'USER': 'postgres',
+#         'PASSWORD': 'postgres',
+#         'HOST': '127.0.0.1',
+#         'PORT': '5432',
+#     }
+# }
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -276,3 +290,12 @@ LINKEDIN_REDIRECT_URI = os.getenv("LINKEDIN_REDIRECT_URI")
 # Media files (uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+
+ASGI_APPLICATION = "IhrHub.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}
