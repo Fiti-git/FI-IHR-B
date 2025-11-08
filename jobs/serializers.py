@@ -22,6 +22,8 @@ class JobApplicationSerializer(serializers.ModelSerializer):
     Excludes expected_rate, status, rating, comments from POST requests
     """
     job_id = serializers.IntegerField(write_only=True)
+    # Resume is now a FileField on the model; expose it as a file field in the API
+    resume = serializers.FileField(required=False, allow_null=True, use_url=True)
     
     class Meta:
         model = JobApplication
