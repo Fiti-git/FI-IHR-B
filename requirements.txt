@@ -47,4 +47,4 @@ packaging==25.0
 # WebSockets / Async
 channels==3.0.4
 daphne
-uvicorn
+uvicorn[standard]
