@@ -37,5 +37,6 @@ class TokenAuthMiddleware:
             scope['user'] = await get_user(token)
         else:
             scope['user'] = AnonymousUser()
+        print(f"[TokenAuthMiddleware] Authenticated user: {scope['user']}")
         
         return await self.inner(scope, receive, send)
