@@ -294,9 +294,9 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         applications = self.queryset.filter(job_id=job_id)
         applications_list = []
 
-        # Fetch employer info
+        # Fetch jobprovider info
         job_posting = JobPosting.objects.select_related('job_provider').filter(id=job_id).first()
-        employer_user_id = job_posting.job_provider.user_id if job_posting and job_posting.job_provider else None
+        jobprovider_user_id = job_posting.job_provider.user_id if job_posting and job_posting.job_provider else None
 
         for app in applications:
             # Get freelancer profile and name
@@ -316,12 +316,12 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 "freelancer_id": app.freelancer_id,
                 "freelancer_user_id": freelancer_user_id,
                 "freelancer_name": freelancer_name,
-                "employer_user_id": employer_user_id,
+                "employer_user_id": jobprovider_user_id,
                 "resume_url": app.resume.url if app.resume else None,
                 "cover_letter_url": app.cover_letter,
                 "status": app.status,
                 "rating": app.rating,
-                "chat_users": [freelancer_user_id, employer_user_id] if employer_user_id else [freelancer_user_id],
+                "chat_users": [freelancer_user_id, jobprovider_user_id] if jobprovider_user_id else [freelancer_user_id],
             })
 
         return Response({"applications": applications_list})

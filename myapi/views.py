@@ -95,7 +95,7 @@ class SignInView(APIView):
             
             ## CHANGE: Get the user's role from their group assignment.
             user_groups = user.groups.values_list('name', flat=True)
-            role = user_groups[0].lower() if user_groups else None # e.g., 'employer' or null
+            role = user_groups[0] if user_groups else None # e.g., 'job provider' or null
 
             ## CHANGE: Return the user's role along with the tokens.
             return Response({
@@ -279,13 +279,13 @@ class SetRoleView(APIView):
 
     def post(self, request, *args, **kwargs):
         user = request.user
-        role_name = request.data.get("role") # Expects "employer" or "employee"
+        role_name = request.data.get("role") # Expects "Freelancer" or "Job Provider"
 
         # Prevent users from changing their role
         if user.groups.exists():
             return Response({"error": "Role has already been set and cannot be changed."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if role_name not in ["employer", "employee"]:
+        if role_name not in ["Freelancer", "Job Provider"]:
             return Response({"error": "Invalid role specified."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Capitalize to match the Group name
