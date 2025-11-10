@@ -14,4 +14,5 @@ RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate && gunicorn aas.wsgi:application --bind 0.0.0.0:8000"]
+# ...
+CMD ["sh", "-c", "python manage.py migrate && gunicorn IhrHub.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000"]
