@@ -6,6 +6,13 @@ from rest_framework.response import Response
 from django.http import Http404
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.views import APIView
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+
+# Import Django's built-in serializers
+from rest_framework.serializers import Serializer, CharField
 
 
 class FreelancerProfileView(APIView):
@@ -212,3 +219,72 @@ class CheckAuthView(APIView):
             'is_freelancer': is_freelancer,
             'is_job_provider': is_job_provider
         })
+
+
+# Custom Serializer for changing password
+class PasswordChangeSerializer(Serializer):
+    old_password = CharField(required=True)
+    new_password = CharField(required=True)
+
+    def validate_old_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise ValidationError("Old password is not correct")
+        return value
+
+    def validate_new_password(self, value):
+        validate_password(value, self.context['request'].user)
+        return value
+        
+    def save(self):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+
+
+# Custom Serializer for setting a new password (for social users)
+class PasswordSetSerializer(Serializer):
+    new_password = CharField(required=True)
+
+    def validate_new_password(self, value):
+        validate_password(value, self.context['request'].user)
+        return value
+
+    def save(self):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+
+
+class PasswordStatusView(APIView):
+    """
+    Checks if the authenticated user has a usable password set.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        return Response({'has_password': user.has_usable_password()})
+
+
+class ChangePasswordView(APIView):
+    """
+    Endpoint to change a password (if one exists) or set a password (for social auth users).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, *args, **kwargs):
+        user = request.user
+
+        # If user has a password, they must provide the old one
+        if user.has_usable_password():
+            serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
+        # If user has no password (social auth), they can set a new one directly
+        else:
+            serializer = PasswordSetSerializer(data=request.data, context={'request': request})
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"detail": "Password updated successfully"}, status=status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -212,7 +212,7 @@ class JobApplication(models.Model):
     comments = models.TextField(
         blank=True,
         null=True,
-        help_text="Comments from employer review"
+        help_text="Comments from job provider review"
     )
     
     class Meta:

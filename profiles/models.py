@@ -73,6 +73,18 @@ class FreelancerProfile(models.Model):
     bio = models.TextField(null=True, blank=True)
     profile_image = models.ImageField(upload_to='profile_images/', blank=True, null=True)
     resume = models.FileField(upload_to='resumes/', blank=True, null=True)
+    education = models.JSONField(
+        null=True, 
+        blank=True, 
+        default=list, 
+        help_text="A list of education entries, e.g., [{'degree': 'B.Sc.', 'school': 'MIT', 'start_year': '2018', 'end_year': '2022', 'description': '...'}]"
+    )
+    work_experience = models.JSONField(
+        null=True,
+        blank=True,
+        default=list,
+        help_text="A list of work experience entries, e.g., [{'job_title': 'UX Designer', 'company': 'Dropbox', 'start_year': '2020', 'end_year': '2022', 'description': '...'}]"
+    )
 
     def __str__(self):
         return f"{self.user.username}'s Freelancer Profile"
