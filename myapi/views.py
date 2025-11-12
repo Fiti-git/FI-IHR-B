@@ -221,15 +221,15 @@ def send_verification_email(user, request):
     
     # Construct the verification link that points to your BACKEND API
     # The frontend will handle the final redirect after a successful API call.
-    verification_url = f"http://localhost:8000/myapi/verify-email/{uid}/{token}/"
+    verification_url = f"http://206.189.134.117:8000/myapi/verify-email/{uid}/{token}/"
     
-    subject = "Verify your email for HRHUB"
+    subject = "Verify your email for IHRHUB"
     
     # Simple text-based email body
     message = f"""
 Hi {user.username},
 
-Thank you for registering with HRHUB!
+Thank you for registering with IHRHUB!
 
 Please click the link below to verify your email and activate your account:
 {verification_url}
@@ -261,11 +261,11 @@ class VerifyEmailView(APIView):
             user.is_active = True
             user.save()
             # SUCCESS: Redirect to the frontend login page with a success flag
-            frontend_url = 'http://localhost:3000/login?verified=true'
+            frontend_url = 'http://206.189.134.117/login?verified=true'
             return HttpResponseRedirect(frontend_url)
         else:
             # FAILURE: Redirect to a frontend error page or the register page
-            frontend_url = 'http://localhost:3000/register?error=invalid_link'
+            frontend_url = 'http://206.189.134.117/register?error=invalid_link'
             return HttpResponseRedirect(frontend_url)
 
 
