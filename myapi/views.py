@@ -95,7 +95,7 @@ class SignInView(APIView):
             
             ## CHANGE: Get the user's role from their group assignment.
             user_groups = user.groups.values_list('name', flat=True)
-            role = user_groups[0].lower() if user_groups else None # e.g., 'employer' or null
+            role = user_groups[0] if user_groups else None # e.g., 'job provider' or null
 
             ## CHANGE: Return the user's role along with the tokens.
             return Response({
@@ -221,15 +221,15 @@ def send_verification_email(user, request):
     
     # Construct the verification link that points to your BACKEND API
     # The frontend will handle the final redirect after a successful API call.
-    verification_url = f"http://localhost:8000/myapi/verify-email/{uid}/{token}/"
+    verification_url = f"http://206.189.134.117:8000/myapi/verify-email/{uid}/{token}/"
     
-    subject = "Verify your email for HRHUB"
+    subject = "Verify your email for IHRHUB"
     
     # Simple text-based email body
     message = f"""
 Hi {user.username},
 
-Thank you for registering with HRHUB!
+Thank you for registering with IHRHUB!
 
 Please click the link below to verify your email and activate your account:
 {verification_url}
@@ -261,11 +261,11 @@ class VerifyEmailView(APIView):
             user.is_active = True
             user.save()
             # SUCCESS: Redirect to the frontend login page with a success flag
-            frontend_url = 'http://localhost:3000/login?verified=true'
+            frontend_url = 'http://206.189.134.117/login?verified=true'
             return HttpResponseRedirect(frontend_url)
         else:
             # FAILURE: Redirect to a frontend error page or the register page
-            frontend_url = 'http://localhost:3000/register?error=invalid_link'
+            frontend_url = 'http://206.189.134.117/register?error=invalid_link'
             return HttpResponseRedirect(frontend_url)
 
 
@@ -279,13 +279,13 @@ class SetRoleView(APIView):
 
     def post(self, request, *args, **kwargs):
         user = request.user
-        role_name = request.data.get("role") # Expects "employer" or "employee"
+        role_name = request.data.get("role") # Expects "Freelancer" or "Job Provider"
 
         # Prevent users from changing their role
         if user.groups.exists():
             return Response({"error": "Role has already been set and cannot be changed."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if role_name not in ["employer", "employee"]:
+        if role_name not in ["Freelancer", "Job Provider"]:
             return Response({"error": "Invalid role specified."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Capitalize to match the Group name

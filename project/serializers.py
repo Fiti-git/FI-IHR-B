@@ -110,15 +110,15 @@ class ProposalSerializer(serializers.ModelSerializer):
     freelancer_id = serializers.IntegerField(write_only=True, required=False)
     project_title = serializers.CharField(source='project.title', read_only=True)
 
-    # 👇 Add this new field for chat participants
-    chat = serializers.SerializerMethodField()
+    # 👇 Add this new field for chat_users participants
+    chat_users = serializers.SerializerMethodField()
 
     class Meta:
         model = Proposal
         fields = [
             'id', 'project', 'project_title', 'freelancer', 'freelancer_id',
             'budget', 'cover_letter', 'status', 'submitted_at', 'updated_at',
-            'chat',  # include here
+            'chat_users',  # include here
         ]
         read_only_fields = ['submitted_at', 'updated_at']
 
@@ -143,7 +143,7 @@ class ProposalSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Budget must be greater than zero")
         return value
 
-    def get_chat(self, obj):
+    def get_chat_users(self, obj):
         """
         Return [freelancer_user_id, job_provider_user_id]
         Both are from the auth User table.

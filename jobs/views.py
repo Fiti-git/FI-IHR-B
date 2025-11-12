@@ -13,6 +13,8 @@ from .serializers import (
     ApplicationWithdrawalSerializer
 )
 
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import permissions
 from profiles.models import FreelancerProfile
@@ -176,7 +178,7 @@ class JobPostingViewSet(viewsets.ModelViewSet):
                 app_dict = {
                     "application_id": app.id,
                     "freelancer_id": app.freelancer_id,
-                    "resume": app.resume,
+                    "resume_url": app.resume.url if app.resume else None,
                     "cover_letter": app.cover_letter,
                     "expected_rate": app.expected_rate,
                     "status": app.status,
@@ -248,20 +250,21 @@ class JobPostingViewSet(viewsets.ModelViewSet):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+
 class JobApplicationViewSet(viewsets.ModelViewSet):
     """
-    Simplified JobApplication ViewSet following the example pattern
+    ViewSet for Job Applications
     """
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'application_id'
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
     
     def create(self, request, *args, **kwargs):
         """POST /api/job-application - Apply to job"""
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            # Get job_id from validated data and remove it
             job_id = serializer.validated_data.pop('job_id')
 
             try:
@@ -269,64 +272,31 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
             except JobPosting.DoesNotExist:
                 return Response({"error": "Job posting not found"}, status=status.HTTP_404_NOT_FOUND)
 
-            # Create the application manually to ensure proper field handling
             application = JobApplication.objects.create(
                 job=job,
                 freelancer_id=serializer.validated_data.get('freelancer_id'),
                 resume=serializer.validated_data.get('resume'),
                 cover_letter=serializer.validated_data.get('cover_letter'),
-                expected_rate=serializer.validated_data.get('expected_rate')
+                expected_rate=serializer.validated_data.get('expected_rate'),
             )
-            
+
             return Response({
                 "application_id": application.id,
                 "message": "Application submitted successfully"
             }, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    # @action(detail=False, methods=['get'], url_path='job/(?P<job_id>[0-9]+)')
-    # def get_applications_for_job(self, request, job_id=None):
-    #     """GET /api/job-application/job/{job_id} - Fetch applications for a job"""
-    #     applications = self.queryset.filter(job_id=job_id)
-        
-    #     applications_list = []
-    #     for app in applications:
-    #         # Try to resolve freelancer name from profiles.FreelancerProfile if available
-    #         try:
-    #             from profiles.models import FreelancerProfile
-    #             profile = FreelancerProfile.objects.filter(id=app.freelancer_id).select_related('user').first()
-    #             if profile:
-    #                 freelancer_name = profile.full_name or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
-    #             else:
-    #                 freelancer_name = f"Freelancer {app.freelancer_id}"
-    #         except Exception:
-    #             # Fall back to the numeric id if any error occurs
-    #             freelancer_name = f"Freelancer {app.freelancer_id}"
 
-    #         applications_list.append({
-    #             "application_id": app.id,
-    #             "freelance_id": app.freelancer_id,
-    #             "freelancer_name": freelancer_name,
-    #             "resume_url": app.resume,
-    #             "cover_letter_url": app.cover_letter,
-    #             "status": app.status,
-    #             "rating": app.rating
-    #         })
-        
-    #     return Response({"applications": applications_list})
-
+    # ✅ Single version of get_applications_for_job
     @action(detail=False, methods=['get'], url_path=r'job/(?P<job_id>[0-9]+)')
     def get_applications_for_job(self, request, job_id=None):
         """GET /api/job-application/job/{job_id} - Fetch applications for a job"""
         applications = self.queryset.filter(job_id=job_id)
         applications_list = []
 
-        # Fetch the job posting & employer user id
+        # Fetch jobprovider info
         job_posting = JobPosting.objects.select_related('job_provider').filter(id=job_id).first()
-        employer_user_id = None
-        if job_posting and job_posting.job_provider:
-            # job_provider = JobProviderProfile
-            employer_user_id = job_posting.job_provider.user_id
+        jobprovider_user_id = job_posting.job_provider.user_id if job_posting and job_posting.job_provider else None
 
         for app in applications:
             # Get freelancer profile and name
@@ -339,23 +309,53 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 freelancer_user_id = profile.user_id
             else:
                 freelancer_name = f"Freelancer {app.freelancer_id}"
-                freelancer_user_id = app.freelancer_id  # fallback (since freelancer_id = auth_user_id)
+                freelancer_user_id = app.freelancer_id
 
-            # Add each application entry
             applications_list.append({
                 "application_id": app.id,
                 "freelancer_id": app.freelancer_id,
                 "freelancer_user_id": freelancer_user_id,
                 "freelancer_name": freelancer_name,
-                "employer_user_id": employer_user_id,
-                "resume_url": app.resume,
+                "employer_user_id": jobprovider_user_id,
+                "resume_url": app.resume.url if app.resume else None,
                 "cover_letter_url": app.cover_letter,
                 "status": app.status,
                 "rating": app.rating,
-                "chat_users": [freelancer_user_id, employer_user_id] if employer_user_id else [freelancer_user_id],
+                "chat_users": [freelancer_user_id, jobprovider_user_id] if jobprovider_user_id else [freelancer_user_id],
             })
 
         return Response({"applications": applications_list})
+
+    # ✅ New method to fix your error
+    @action(detail=True, methods=['put'], url_path='update')
+    def update_application_status(self, request, application_id=None):
+        """PUT /api/job-application/update/{application_id}/ - Update application status or rating"""
+        try:
+            application = self.get_object()
+        except JobApplication.DoesNotExist:
+            return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        status_value = request.data.get("status")
+        rating_value = request.data.get("rating")
+
+        if not status_value and rating_value is None:
+            return Response({"error": "Provide at least 'status' or 'rating' to update."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if status_value:
+            application.status = status_value
+        if rating_value is not None:
+            application.rating = rating_value
+
+        application.save()
+
+        return Response({
+            "message": "Application updated successfully",
+            "application_id": application.id,
+            "status": application.status,
+            "rating": application.rating
+        }, status=status.HTTP_200_OK)
+
 class JobInterviewViewSet(viewsets.ModelViewSet):
     """
     Simplified JobInterview ViewSet following the example pattern
