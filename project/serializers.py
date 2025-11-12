@@ -4,6 +4,8 @@ from .models import Project, Proposal, Milestone, MilestonePayment, Feedback, Pr
 from django.utils import timezone
 from profiles.models import JobProviderProfile
 
+
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -20,15 +22,18 @@ class ProjectSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     image_url = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
+    country_name = serializers.CharField(source='user.job_provider_profile.get_country_display', read_only=True)
+    project_count = serializers.SerializerMethodField()
+    join_date = serializers.DateTimeField(source='user.date_joined', read_only=True)
     
     class Meta:
         model = Project
         fields = [
             'id', 'user', 'title', 'description', 'category', 
             'budget', 'project_type', 'deadline', 'visibility', 'status','image', 'image_url',
-            'created_at', 'updated_at', 'company_name'
+            'created_at', 'updated_at', 'company_name', 'country_name', 'project_count', 'join_date'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'user']
+        read_only_fields = ['created_at', 'updated_at', 'user','country_name', 'company_name', 'project_count', 'join_date']
 
     def get_company_name(self, obj):
         try:
@@ -36,6 +41,17 @@ class ProjectSerializer(serializers.ModelSerializer):
             return profile.company_name
         except JobProviderProfile.DoesNotExist:
             return None
+
+    def get_country_name(self, obj):
+        try:
+            profile = JobProviderProfile.objects.get(user=obj.user)
+            return profile.country_name
+        except JobProviderProfile.DoesNotExist:
+            return None
+        
+    def get_project_count(self, obj):
+        """Count how many projects this job provider (user) has."""
+        return Project.objects.filter(user=obj.user).count()
         
     def get_image_url(self, obj):
         """Return full URL for image"""
