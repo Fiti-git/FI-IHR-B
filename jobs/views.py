@@ -112,7 +112,8 @@ class JobPostingViewSet(viewsets.ModelViewSet):
                 "location": job.work_location,
                 "date_posted": job.date_posted.strftime('%Y-%m-%d') if job.date_posted else None,
                 "job_status": job.job_status,
-                "job_category": job.job_category
+                "job_category": job.job_category,
+                "job_type": job.job_type,
             })
         
         return Response({"jobs": jobs_list})
