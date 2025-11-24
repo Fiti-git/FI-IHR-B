@@ -544,6 +544,12 @@ class JobOfferViewSet(viewsets.ModelViewSet):
         offer.offer_status = 'Accepted'
         offer.date_accepted = timezone.now()
         offer.date_rejected = None
+        
+        # Handle Multiple_Document file upload
+        multiple_document = request.FILES.get('Multiple_Document')
+        if multiple_document:
+            offer.multi_doc = multiple_document
+        
         offer.save()
         return Response({'message': 'Job offer accepted'})
     

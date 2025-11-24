@@ -420,6 +420,10 @@ class JobOffer(models.Model):
         help_text="Date the offer was rejected (nullable)"
     )
     
+    # Column 8: multi_doc
+    multi_doc = models.FileField(upload_to='multi_doc/', blank=True, null=True)
+    
+    
     class Meta:
         db_table = 'job_offer'
         ordering = ['-date_offered']

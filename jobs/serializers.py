@@ -82,7 +82,7 @@ class JobOfferSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = JobOffer
-        fields = ['id', 'offer_status', 'offer_details', 'date_offered', 'date_accepted', 'date_rejected']
+        fields = ['id', 'offer_status', 'offer_details', 'date_offered', 'date_accepted', 'date_rejected', 'multi_doc']
         read_only_fields = ['id', 'date_offered', 'date_accepted', 'date_rejected']
 
 
