@@ -52,7 +52,7 @@ class JobPosting(models.Model):
             ('engineering', 'Engineering'),
             ('marketing', 'Marketing'),
             ('sales', 'Sales'),
-            ('hr', 'Human Resources'),
+            ('human resources', 'Human Resources'),
             ('finance', 'Finance'),
             ('operations', 'Operations'),
             ('design', 'Design'),
