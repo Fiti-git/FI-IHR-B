@@ -70,12 +70,12 @@ job_offer_create = JobOfferViewSet.as_view({
     'post': 'create_offer'
 })
 
-job_offer_accept = JobOfferViewSet.as_view({
-    'post': 'accept_offer'
+job_offer_update = JobOfferViewSet.as_view({
+    'put': 'update_offer'
 })
 
-job_offer_reject = JobOfferViewSet.as_view({
-    'post': 'reject_offer'
+job_offer_all = JobOfferViewSet.as_view({
+    'get': 'get_all_offers'
 })
 
 # ===== APPLICATION WITHDRAWAL URLS =====
@@ -112,8 +112,8 @@ urlpatterns = [
     
     # ===== JOB OFFER ENDPOINTS =====
     path('offer/create/', job_offer_create, name='job-offer-create'),
-    path('offer/accept/', job_offer_accept, name='job-offer-accept'),
-    path('offer/reject/', job_offer_reject, name='job-offer-reject'),
+    path('offer/update/', job_offer_update, name='job-offer-update'),
+    path('offer/all/', job_offer_all, name='job-offer-all'),
     
     # ===== APPLICATION WITHDRAWAL ENDPOINTS =====
     path('withdrawals/', withdrawal_list, name='application-withdrawal-list'),

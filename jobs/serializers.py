@@ -82,7 +82,7 @@ class JobOfferSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = JobOffer
-        fields = ['id', 'offer_status', 'offer_details', 'date_offered', 'date_accepted', 'date_rejected', 'multi_doc']
+        fields = ['id', 'application', 'offer_status', 'offer_details', 'date_offered', 'date_accepted', 'date_rejected', 'multi_doc']
         read_only_fields = ['id', 'date_offered', 'date_accepted', 'date_rejected']
 
 
@@ -103,6 +103,11 @@ class JobOfferCreateSerializer(serializers.Serializer):
         ],
         default='Pending',
         help_text="Status of the offer"
+    )
+    multi_doc = serializers.FileField(
+        required=False,
+        allow_null=True,
+        help_text="Optional document file for the job offer"
     )
     
     def validate_offer_details(self, value):
@@ -137,6 +142,32 @@ class JobOfferCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Benefits must be a list")
         
         return value
+
+
+class JobOfferUpdateSerializer(serializers.Serializer):
+    """
+    Serializer for updating job offers
+    """
+    offer_status = serializers.ChoiceField(
+        choices=[
+            ('Pending', 'Pending'),
+            ('Accepted', 'Accepted'),
+            ('Rejected', 'Rejected'),
+            ('Withdrawn', 'Withdrawn'),
+        ],
+        required=False,
+        help_text="Status of the offer"
+    )
+    offer_details = serializers.CharField(
+        min_length=1,
+        required=False,
+        help_text="Detailed offer (salary, benefits, etc.)"
+    )
+    multi_doc = serializers.FileField(
+        required=False,
+        allow_null=True,
+        help_text="Optional document file for the job offer"
+    )
 
 
 class ApplicationWithdrawalSerializer(serializers.ModelSerializer):

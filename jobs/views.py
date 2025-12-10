@@ -10,7 +10,7 @@ from .models import JobPosting, JobApplication, JobInterview, JobOffer, Applicat
 from .serializers import (
     JobPostingSerializer, JobApplicationSerializer, JobApplicationUpdateSerializer,
     JobInterviewSerializer, JobOfferSerializer, JobOfferCreateSerializer,
-    ApplicationWithdrawalSerializer
+    JobOfferUpdateSerializer, ApplicationWithdrawalSerializer
 )
 
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -495,6 +495,7 @@ class JobOfferViewSet(viewsets.ModelViewSet):
     """
     queryset = JobOffer.objects.all()
     serializer_class = JobOfferSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     @swagger_auto_schema(request_body=JobOfferCreateSerializer, responses={201: JobOfferSerializer()})
     @action(detail=False, methods=['post'], url_path='create')
@@ -509,6 +510,7 @@ class JobOfferViewSet(viewsets.ModelViewSet):
         application_id = validated.get('application_id')
         offer_status = validated.get('offer_status', 'Pending')
         offer_details = validated.get('offer_details')
+        multi_doc = validated.get('multi_doc')
 
         try:
             application = JobApplication.objects.get(id=application_id)
@@ -522,7 +524,8 @@ class JobOfferViewSet(viewsets.ModelViewSet):
         offer = JobOffer.objects.create(
             application=application,
             offer_status=offer_status,
-            offer_details=offer_details_text
+            offer_details=offer_details_text,
+            multi_doc=multi_doc
         )
 
         return Response({
@@ -530,45 +533,99 @@ class JobOfferViewSet(viewsets.ModelViewSet):
             "message": "Job offer created successfully"
         }, status=status.HTTP_201_CREATED)
     
-    @action(detail=False, methods=['post'], url_path='accept')
-    def accept_offer(self, request):
-        """POST /api/job-offer/accept - Accept a job offer"""
+    @swagger_auto_schema(
+        request_body=JobOfferUpdateSerializer,
+        responses={200: JobOfferSerializer()}
+    )
+    @action(detail=False, methods=['put'], url_path='update')
+    def update_offer(self, request):
+        """PUT /api/job-offer/update - Update a job offer"""
+        import json
+        from django.utils import timezone
+        
         offer_id = request.data.get('offer_id')
         if not offer_id:
             return Response(
-                {"error": "offer_id is required"}, 
+                {"error": "offer_id is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        offer = get_object_or_404(JobOffer, id=offer_id)
-        offer.offer_status = 'Accepted'
-        offer.date_accepted = timezone.now()
-        offer.date_rejected = None
+        try:
+            offer = JobOffer.objects.get(id=offer_id)
+        except JobOffer.DoesNotExist:
+            return Response(
+                {"error": "Job offer not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
         
-        # Handle Multiple_Document file upload
-        multiple_document = request.FILES.get('Multiple_Document')
-        if multiple_document:
-            offer.multi_doc = multiple_document
+        # Validate input using JobOfferUpdateSerializer
+        serializer = JobOfferUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        validated = serializer.validated_data
+        
+        # Update offer_status
+        if 'offer_status' in validated:
+            old_status = offer.offer_status
+            new_status = validated['offer_status']
+            offer.offer_status = new_status
+            
+            # Update date fields based on status changes
+            if new_status == 'Accepted' and old_status != 'Accepted':
+                offer.date_accepted = timezone.now()
+            elif new_status == 'Rejected' and old_status != 'Rejected':
+                offer.date_rejected = timezone.now()
+        
+        # Update offer_details
+        if 'offer_details' in validated:
+            offer_details = validated['offer_details']
+            # If it's already a JSON string, keep it; otherwise convert it
+            if isinstance(offer_details, str):
+                try:
+                    # Validate it's valid JSON
+                    json.loads(offer_details)
+                    offer.offer_details = offer_details
+                except json.JSONDecodeError:
+                    offer.offer_details = offer_details
+            else:
+                offer.offer_details = json.dumps(offer_details)
+        
+        # Update multi_doc if provided
+        if 'multi_doc' in validated and validated['multi_doc']:
+            offer.multi_doc = validated['multi_doc']
         
         offer.save()
-        return Response({'message': 'Job offer accepted'})
+        
+        return Response({
+            "offer_id": offer.id,
+            "message": "Job offer updated successfully",
+            "offer_status": offer.offer_status
+        }, status=status.HTTP_200_OK)
     
-    @action(detail=False, methods=['post'], url_path='reject')
-    def reject_offer(self, request):
-        """POST /api/job-offer/reject - Reject a job offer"""
-        offer_id = request.data.get('offer_id')
-        if not offer_id:
-            return Response(
-                {"error": "offer_id is required"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+    @swagger_auto_schema(
+        method='get',
+        responses={200: JobOfferSerializer(many=True)}
+    )
+    @action(detail=False, methods=['get'], url_path='all')
+    def get_all_offers(self, request):
+        """GET /api/job-offer/all - Get all job offers with all fields"""
+        offers = JobOffer.objects.all().select_related('application')
         
-        offer = get_object_or_404(JobOffer, id=offer_id)
-        offer.offer_status = 'Rejected'
-        offer.date_rejected = timezone.now()
-        offer.date_accepted = None
-        offer.save()
-        return Response({'message': 'Job offer rejected'})
+        offers_list = []
+        for offer in offers:
+            offers_list.append({
+                "offer_id": offer.id,
+                "application_id": offer.application.id,
+                "offer_status": offer.offer_status,
+                "offer_details": offer.offer_details,
+                "date_offered": offer.date_offered.strftime('%Y-%m-%d %H:%M:%S') if offer.date_offered else None,
+                "date_accepted": offer.date_accepted.strftime('%Y-%m-%d %H:%M:%S') if offer.date_accepted else None,
+                "date_rejected": offer.date_rejected.strftime('%Y-%m-%d %H:%M:%S') if offer.date_rejected else None,
+                "multi_doc": offer.multi_doc.url if offer.multi_doc else None,
+            })
+        
+        return Response({"offers": offers_list}, status=status.HTTP_200_OK)
 
 
 class ApplicationWithdrawalViewSet(viewsets.ModelViewSet):
