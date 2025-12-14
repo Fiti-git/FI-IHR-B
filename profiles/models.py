@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils.timezone import now
 
 class FreelancerProfile(models.Model):
     GENDER_CHOICES = [
@@ -85,6 +86,10 @@ class FreelancerProfile(models.Model):
         default=list,
         help_text="A list of work experience entries, e.g., [{'job_title': 'UX Designer', 'company': 'Dropbox', 'start_year': '2020', 'end_year': '2022', 'description': '...'}]"
     )
+    is_active = models.BooleanField(default=True)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=now, editable=False)
+    updated_at = models.DateTimeField(default=now)
 
     def __str__(self):
         return f"{self.user.username}'s Freelancer Profile"
@@ -134,6 +139,10 @@ class JobProviderProfile(models.Model):
     country = models.CharField(max_length=20, choices=COUNTRY_CHOICES, default='usa')
     
     # Add any additional fields here if needed (for example, social media, website URL, etc.)
+    is_active = models.BooleanField(default=True)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=now, editable=False)
+    updated_at = models.DateTimeField(default=now)
     
     def __str__(self):
         return f"{self.company_name} - Profile"

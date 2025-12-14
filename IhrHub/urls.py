@@ -31,7 +31,7 @@ urlpatterns = [
     # Admin ui
     #path('grappelli/', include('grappelli.urls')),
     # path('', login_page, name='login_page'),
-    path('admin/', admin.site.urls),
+    path('', admin.site.urls),
 
     # Authentication routes
     # path('api/auth/', include('dj_rest_auth.urls')),
