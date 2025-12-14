@@ -51,3 +51,5 @@ uvicorn[standard]
 
 whitenoise
 
+# Admin Interface
+django-grappelli

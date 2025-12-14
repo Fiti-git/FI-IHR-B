@@ -28,6 +28,8 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
+    # Admin ui
+    #path('grappelli/', include('grappelli.urls')),
     # path('', login_page, name='login_page'),
     path('admin/', admin.site.urls),
 
@@ -54,7 +56,6 @@ urlpatterns = [
     path('custom-swagger/', custom_swagger_ui, name='custom-swagger-ui'),
 
     # App routes
-    path('api/support/', include('support.urls')),
     path('api/project/', include('project.urls')),
     path('api/job-', include('jobs.urls')),  # Job posting and related endpoints
     # path('api/auth/', include('accounts.urls')),
@@ -73,6 +74,9 @@ urlpatterns = [
 
     #chat app
     path('api/chat/', include('chat.urls')),
+
+    #choice manager
+    path('api/', include('choices_manager.urls')),
 ]
 
 # Serve media files during development
