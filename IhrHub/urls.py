@@ -31,7 +31,7 @@ urlpatterns = [
     # Admin ui
     #path('grappelli/', include('grappelli.urls')),
     # path('', login_page, name='login_page'),
-    path('', admin.site.urls),
+    path('admin/', admin.site.urls),
 
     # Authentication routes
     # path('api/auth/', include('dj_rest_auth.urls')),
@@ -74,6 +74,9 @@ urlpatterns = [
 
     #chat app
     path('api/chat/', include('chat.urls')),
+
+   #support app
+   path('support/', include('support.urls')), 
 
     #choice manager
     path('api/', include('choices_manager.urls')),
