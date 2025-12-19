@@ -26,7 +26,6 @@ class SupportTicket(models.Model):
         choices=TICKET_TYPE_CHOICES
     )
 
-    # project_id or job_id
     reference_id = models.PositiveIntegerField()
     reference_title = models.CharField(max_length=255)
 
@@ -82,18 +81,7 @@ class SupportTicket(models.Model):
     # -------------------------
     messages = models.JSONField(
         default=list,
-        blank=True,
-        help_text="""
-        Example:
-        [
-          {
-            "sender": "user",
-            "sender_id": 5,
-            "message": "I need help",
-            "timestamp": "2025-12-17T10:15:00Z"
-          }
-        ]
-        """
+        blank=True
     )
 
     # -------------------------

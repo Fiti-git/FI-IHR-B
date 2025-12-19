@@ -120,11 +120,11 @@ class JobPostingViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='job-manage')
     def job_manage(self, request):
-        """GET /api/job-posting/job-manage?job_provider_id=ID - Return all jobs, applications, interviews and offers for a job provider"""
+        """GET /api/job-posting/job-manage?job_provider_id=ID"""
+
         job_provider_id = request.query_params.get('job_provider_id') or request.query_params.get('provider_id')
 
-        # If not provided, try to infer from authenticated user's JobProviderProfile
-        if not job_provider_id and hasattr(request, 'user') and request.user and request.user.is_authenticated:
+        if not job_provider_id and request.user and request.user.is_authenticated:
             try:
                 from profiles.models import JobProviderProfile
                 profile = JobProviderProfile.objects.filter(user=request.user).first()
@@ -136,10 +136,47 @@ class JobPostingViewSet(viewsets.ModelViewSet):
         if not job_provider_id:
             return Response({"error": "job_provider_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Collect jobs for this provider
+        # -----------------------------------------
+        # Jobs
+        # -----------------------------------------
         jobs_qs = JobPosting.objects.filter(job_provider_id=job_provider_id)
 
+        # -----------------------------------------
+        # Collect ALL applications ONCE
+        # -----------------------------------------
+        applications_all = JobApplication.objects.filter(job__in=jobs_qs)
+
+        freelancer_ids = set(applications_all.values_list("freelancer_id", flat=True))
+
+        # -----------------------------------------
+        # Fetch freelancer profiles ONCE
+        # -----------------------------------------
+        from profiles.models import FreelancerProfile
+
+        profiles_qs = (
+            FreelancerProfile.objects
+            .select_related("user")
+            .filter(id__in=freelancer_ids)
+        )
+
+        freelancer_profiles = {}
+        for p in profiles_qs:
+            freelancer_profiles[p.id] = {
+                "profile_id": p.id,
+                "user_id": p.user_id,
+                "full_name": p.full_name,
+                "email": p.user.email if p.user else None,
+                "phone": p.phone_number,
+                "skills": p.skills,
+                "experience_level": p.experience_level,
+                "profile_image": p.profile_image.url if p.profile_image else None,
+            }
+
+        # -----------------------------------------
+        # Build response (NO breaking changes)
+        # -----------------------------------------
         result_jobs = []
+
         for job in jobs_qs:
             job_dict = {
                 "job_id": job.id,
@@ -172,13 +209,12 @@ class JobPostingViewSet(viewsets.ModelViewSet):
                 "job_status": job.job_status,
             }
 
-            # Applications for this job
-            applications_qs = JobApplication.objects.filter(job=job)
             applications_list = []
-            for app in applications_qs:
+
+            for app in applications_all.filter(job=job):
                 app_dict = {
                     "application_id": app.id,
-                    "freelancer_id": app.freelancer_id,
+                    "freelancer_id": app.freelancer_id,  # ⛔ DO NOT CHANGE
                     "resume_url": app.resume.url if app.resume else None,
                     "cover_letter": app.cover_letter,
                     "expected_rate": app.expected_rate,
@@ -186,12 +222,14 @@ class JobPostingViewSet(viewsets.ModelViewSet):
                     "date_applied": app.date_applied.strftime('%Y-%m-%d %H:%M:%S') if app.date_applied else None,
                     "rating": app.rating,
                     "comments": app.comments,
+
+                    # ✅ SAFE ADDITION
+                    "freelancer_profile": freelancer_profiles.get(app.freelancer_id),
                 }
 
-                # Interviews for this application
-                interviews_qs = JobInterview.objects.filter(application=app)
+                # Interviews
                 interviews_list = []
-                for iv in interviews_qs:
+                for iv in JobInterview.objects.filter(application=app):
                     interviews_list.append({
                         "interview_id": iv.id,
                         "interview_date": iv.interview_date.strftime('%Y-%m-%d %H:%M:%S') if iv.interview_date else None,
@@ -203,10 +241,9 @@ class JobPostingViewSet(viewsets.ModelViewSet):
                         "comments": iv.comments,
                     })
 
-                # Offers for this application
-                offers_qs = JobOffer.objects.filter(application=app)
+                # Offers
                 offers_list = []
-                for of in offers_qs:
+                for of in JobOffer.objects.filter(application=app):
                     offers_list.append({
                         "offer_id": of.id,
                         "offer_status": of.offer_status,
@@ -216,17 +253,18 @@ class JobPostingViewSet(viewsets.ModelViewSet):
                         "date_rejected": of.date_rejected.strftime('%Y-%m-%d %H:%M:%S') if of.date_rejected else None,
                     })
 
-                app_dict['interviews'] = interviews_list
-                app_dict['offers'] = offers_list
-
+                app_dict["interviews"] = interviews_list
+                app_dict["offers"] = offers_list
                 applications_list.append(app_dict)
 
-            job_dict['applications'] = applications_list
-
+            job_dict["applications"] = applications_list
             result_jobs.append(job_dict)
 
-        return Response({"job_provider_id": job_provider_id, "jobs": result_jobs})
-    
+        return Response({
+            "job_provider_id": job_provider_id,
+            "jobs": result_jobs
+        })
+
     def update(self, request, *args, **kwargs):
         """PUT /api/job-posting/{job_id} - Update job posting"""
         partial = kwargs.pop('partial', False)
@@ -288,33 +326,80 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # ✅ Single version of get_applications_for_job
+    
     @action(detail=False, methods=['get'], url_path=r'job/(?P<job_id>[0-9]+)')
     def get_applications_for_job(self, request, job_id=None):
         """GET /api/job-application/job/{job_id} - Fetch applications for a job"""
+
         applications = self.queryset.filter(job_id=job_id)
+
+        # -------------------------------------------------
+        # Fetch job provider user_id
+        # -------------------------------------------------
+        job_posting = (
+            JobPosting.objects
+            .select_related('job_provider')
+            .filter(id=job_id)
+            .first()
+        )
+        jobprovider_user_id = (
+            job_posting.job_provider.user_id
+            if job_posting and job_posting.job_provider
+            else None
+        )
+
+        # -------------------------------------------------
+        # Collect freelancer_ids (profile IDs)
+        # -------------------------------------------------
+        freelancer_ids = set(applications.values_list("freelancer_id", flat=True))
+
+        # -------------------------------------------------
+        # Fetch freelancer profiles ONCE
+        # -------------------------------------------------
+        from profiles.models import FreelancerProfile
+
+        profiles_qs = (
+            FreelancerProfile.objects
+            .select_related("user")
+            .filter(id__in=freelancer_ids)
+        )
+
+        profiles_map = {}
+        for p in profiles_qs:
+            profiles_map[p.id] = {
+                "profile_id": p.id,
+                "user_id": p.user_id,
+                "full_name": p.full_name,
+                "username": p.user.username if p.user else None,
+            }
+
+        # -------------------------------------------------
+        # Build response (NO breaking changes)
+        # -------------------------------------------------
         applications_list = []
 
-        # Fetch jobprovider info
-        job_posting = JobPosting.objects.select_related('job_provider').filter(id=job_id).first()
-        jobprovider_user_id = job_posting.job_provider.user_id if job_posting and job_posting.job_provider else None
-
         for app in applications:
-            # Get freelancer profile and name
-            profile = FreelancerProfile.objects.select_related('user').filter(user_id=app.freelancer_id).first()
-            if profile:
-                freelancer_name = (
-                    profile.full_name
-                    or (profile.user.username if profile.user else f"Freelancer {app.freelancer_id}")
+            profile = profiles_map.get(app.freelancer_id)
+
+            freelancer_name = (
+                profile["full_name"]
+                if profile and profile.get("full_name")
+                else (
+                    profile["username"]
+                    if profile and profile.get("username")
+                    else f"Freelancer {app.freelancer_id}"
                 )
-                freelancer_user_id = profile.user_id
-            else:
-                freelancer_name = f"Freelancer {app.freelancer_id}"
-                freelancer_user_id = app.freelancer_id
+            )
+
+            freelancer_user_id = (
+                profile["user_id"]
+                if profile
+                else app.freelancer_id
+            )
 
             applications_list.append({
                 "application_id": app.id,
-                "freelancer_id": app.freelancer_id,
+                "freelancer_id": app.freelancer_id,     # ⛔ unchanged
                 "freelancer_user_id": freelancer_user_id,
                 "freelancer_name": freelancer_name,
                 "employer_user_id": jobprovider_user_id,
@@ -322,10 +407,18 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 "cover_letter_url": app.cover_letter,
                 "status": app.status,
                 "rating": app.rating,
-                "chat_users": [freelancer_user_id, jobprovider_user_id] if jobprovider_user_id else [freelancer_user_id],
+                "chat_users": (
+                    [freelancer_user_id, jobprovider_user_id]
+                    if jobprovider_user_id
+                    else [freelancer_user_id]
+                ),
+
+                # ✅ SAFE ADDITION (optional for frontend)
+                "freelancer_profile": profile,
             })
 
         return Response({"applications": applications_list})
+
 
     # ✅ New method to fix your error
     @action(detail=True, methods=['put'], url_path='update')

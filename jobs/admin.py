@@ -1,304 +1,288 @@
 from django.contrib import admin
-from .models import JobPosting, JobApplication, JobInterview, JobOffer, ApplicationWithdrawal
+from django.utils.html import format_html
+from django.urls import reverse
+
+from .models import (
+    JobPosting,
+    JobApplication,
+    JobInterview,
+    JobOffer,
+    ApplicationWithdrawal,
+)
+from profiles.models import FreelancerProfile
 
 
+# =====================================================
+# MIXINS
+# =====================================================
+class JobStatusActionMixin:
+    """Common job status actions"""
+
+    @admin.action(description="Mark selected jobs as Open")
+    def mark_open(self, request, queryset):
+        queryset.update(job_status="open")
+
+    @admin.action(description="Mark selected jobs as Closed")
+    def mark_closed(self, request, queryset):
+        queryset.update(job_status="closed")
+
+
+# =====================================================
+# JOB POSTINGS
+# =====================================================
 @admin.register(JobPosting)
-class JobPostingAdmin(admin.ModelAdmin):
-    """
-    Admin interface for JobPosting model
-    """
-    list_display = [
-        'job_title', 
-        'department', 
-        'job_type', 
-        'work_mode', 
-        'job_status', 
-        'number_of_openings',
-        'date_posted',
-        'application_deadline'
-    ]
-    
-    list_filter = [
-        'job_type',
-        'work_mode', 
-        'job_category',
-        'job_status',
-        'currency',
-        'health_insurance',
-        'remote_work',
-        'paid_leave',
-        'bonus',
-        'date_posted'
-    ]
-    
-    search_fields = [
-        'job_title',
-        'department', 
-        'work_location',
-        'hiring_manager',
-        'role_overview',
-        'key_responsibilities'
-    ]
-    
-    readonly_fields = ['date_posted']
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': (
-                'job_title',
-                'department', 
-                'job_provider',
-                'job_type',
-                'job_category',
-                'work_location',
-                'work_mode',
-                'number_of_openings'
-            )
-        }),
-        ('Job Details', {
-            'fields': (
-                'role_overview',
-                'key_responsibilities', 
-                'required_qualifications',
-                'preferred_qualifications',
-                'languages_required'
-            )
-        }),
-        ('Salary & Benefits', {
-            'fields': (
-                'salary_from',
-                'salary_to',
-                'currency',
-                'health_insurance',
-                'remote_work', 
-                'paid_leave',
-                'bonus'
-            )
-        }),
-        ('Application Process', {
-            'fields': (
-                'application_method',
-                'application_deadline',
-                'interview_mode',
-                'hiring_manager',
-                'expected_start_date',
-                'screening_questions',
-                'file_upload'
-            )
-        }),
-        ('Status & Metadata', {
-            'fields': (
-                'job_status',
-                'date_posted'
-            )
-        })
+class JobPostingAdmin(JobStatusActionMixin, admin.ModelAdmin):
+    verbose_name = "Job"
+    verbose_name_plural = "Jobs"
+
+    list_display = (
+        "job_title",
+        "department",
+        "employer_link",
+        "job_type",
+        "work_mode",
+        "job_status",
+        "date_posted",
+        "number_of_openings",
     )
-    
-    def get_readonly_fields(self, request, obj=None):
-        """Make date_posted readonly for existing objects"""
-        if obj:  # editing an existing object
-            return self.readonly_fields + ['date_posted']
-        return self.readonly_fields
+
+    list_filter = (
+        "job_type",
+        "work_mode",
+        "job_status",
+        "department",
+    )
+
+    search_fields = (
+        "job_title",
+        "department",
+        "job_provider__company_name",
+    )
+
+    ordering = ("-date_posted",)
+    list_per_page = 25
+    actions = ["mark_open", "mark_closed"]
+
+    readonly_fields = ("date_posted",)
+
+    fieldsets = (
+        ("Job Details", {
+            "fields": (
+                "job_provider",
+                "job_title",
+                "department",
+                "job_type",
+                "work_location",
+                "work_mode",
+                "job_category",
+                "number_of_openings",
+                "expected_start_date",
+            )
+        }),
+        ("Description", {
+            "fields": (
+                "role_overview",
+                "key_responsibilities",
+                "required_qualifications",
+                "preferred_qualifications",
+                "languages_required",
+            )
+        }),
+        ("Salary & Benefits", {
+            "fields": (
+                "salary_from",
+                "salary_to",
+                "currency",
+                "health_insurance",
+                "remote_work",
+                "paid_leave",
+                "bonus",
+            )
+        }),
+        ("Application & Interview", {
+            "fields": (
+                "application_deadline",
+                "application_method",
+                "interview_mode",
+                "hiring_manager",
+                "screening_questions",
+                "file_upload",
+            )
+        }),
+        ("Status", {
+            "fields": ("job_status", "date_posted")
+        }),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("job_provider")
+
+    def employer_link(self, obj):
+        if not obj.job_provider:
+            return "—"
+        url = reverse(
+            "admin:profiles_jobproviderprofile_change",
+            args=[obj.job_provider.id],
+        )
+        return format_html('<a href="{}">{}</a>', url, obj.job_provider.company_name)
+
+    employer_link.short_description = "Employer"
 
 
+# =====================================================
+# JOB APPLICATIONS
+# =====================================================
 @admin.register(JobApplication)
 class JobApplicationAdmin(admin.ModelAdmin):
-    """
-    Admin interface for JobApplication model
-    """
-    list_display = [
-        'id',
-        'job',
-        'freelancer_id',
-        'status',
-        'expected_rate',
-        'date_applied'
-    ]
-    
-    list_filter = [
-        'status',
-        'date_applied',
-        'job__job_type',
-        'job__job_category'
-    ]
-    
-    search_fields = [
-        'freelancer_id',
-        'job__job_title',
-        'job__department'
-    ]
-    
-    readonly_fields = ['date_applied']
-    
-    fieldsets = (
-        ('Application Information', {
-            'fields': (
-                'job',
-                'freelancer_id',
-                'status'
-            )
-        }),
-        ('Application Details', {
-            'fields': (
-                'resume',
-                'cover_letter',
-                'expected_rate'
-            )
-        }),
-        ('Metadata', {
-            'fields': (
-                'date_applied',
-            )
-        })
+    verbose_name = "Job Application"
+    verbose_name_plural = "Job Applications"
+
+    list_display = (
+        "id",
+        "job_link",
+        "candidate_link",
+        "status",
+        "expected_rate",
+        "date_applied",
+        "rating",
+        "resume_link",
+        "cover_letter_preview",
     )
-    
-    def get_readonly_fields(self, request, obj=None):
-        """Make certain fields readonly for existing objects"""
-        if obj:  # editing an existing object
-            return self.readonly_fields + ['job', 'freelancer_id', 'date_applied']
-        return self.readonly_fields
+
+    list_filter = ("status",)
+    search_fields = ("job__job_title",)
+    ordering = ("-date_applied",)
+    list_per_page = 25
+
+    readonly_fields = ("date_applied",)
+
+    fieldsets = (
+        ("Application Details", {
+            "fields": (
+                "job",
+                "freelancer_id",
+                "resume",
+                "cover_letter",
+                "expected_rate",
+                "status",
+                "rating",
+                "comments",
+            )
+        }),
+    )
+
+    def job_link(self, obj):
+        if not obj.job:
+            return "—"
+        url = reverse("admin:jobs_jobposting_change", args=[obj.job.id])
+        return format_html('<a href="{}">{}</a>', url, obj.job.job_title)
+
+    job_link.short_description = "Job"
+
+    def candidate_link(self, obj):
+        profile = FreelancerProfile.objects.filter(id=obj.freelancer_id).select_related("user").first()
+        if not profile:
+            return "—"
+        url = reverse(
+            "admin:profiles_freelancerprofile_change",
+            args=[profile.id],
+        )
+        return format_html(
+            '<a href="{}">{}</a>',
+            url,
+            profile.full_name or profile.user.username,
+        )
+
+    candidate_link.short_description = "Candidate"
+
+    def resume_link(self, obj):
+        if obj.resume:
+            return format_html('<a href="{}" target="_blank">Download</a>', obj.resume.url)
+        return "—"
+
+    resume_link.short_description = "Resume"
+
+    def cover_letter_preview(self, obj):
+        if not obj.cover_letter:
+            return "—"
+        return obj.cover_letter[:50] + ("..." if len(obj.cover_letter) > 50 else "")
+
+    cover_letter_preview.short_description = "Cover Letter"
 
 
+# =====================================================
+# INTERVIEWS
+# =====================================================
 @admin.register(JobInterview)
 class JobInterviewAdmin(admin.ModelAdmin):
-    """
-    Admin interface for JobInterview model
-    """
-    list_display = [
-        'id',
-        'application',
-        'interview_date',
-        'interview_mode',
-        'status'
-    ]
-    
-    list_filter = [
-        'status',
-        'interview_mode',
-        'interview_date',
-        'application__job__job_type'
-    ]
-    
-    search_fields = [
-        'application__job__job_title',
-        'application__freelancer_id',
-        'interview_notes'
-    ]
-    
-    readonly_fields = []
-    
-    fieldsets = (
-        ('Interview Information', {
-            'fields': (
-                'application',
-                'interview_date',
-                'interview_mode',
-                'status'
-            )
-        }),
-        ('Interview Details', {
-            'fields': (
-                'interview_notes',
-            )
-        })
+    list_display = (
+        "application_link",
+        "interview_date",
+        "interview_mode",
+        "status",
+        "rating",
     )
-    
-    def get_readonly_fields(self, request, obj=None):
-        """Make application field readonly when editing"""
-        if obj:  # editing an existing object
-            return ['application']
-        return []
+
+    list_filter = ("interview_mode", "status")
+    search_fields = ("application__job__job_title",)
+    ordering = ("-interview_date",)
+    list_per_page = 25
+
+    def application_link(self, obj):
+        if not obj.application:
+            return "—"
+        url = reverse("admin:jobs_jobapplication_change", args=[obj.application.id])
+        return format_html('<a href="{}">Application #{}</a>', url, obj.application.id)
+
+    application_link.short_description = "Application"
 
 
+# =====================================================
+# OFFERS
+# =====================================================
 @admin.register(JobOffer)
 class JobOfferAdmin(admin.ModelAdmin):
-    """
-    Admin interface for JobOffer model
-    """
-    list_display = [
-        'id',
-        'application',
-        'offer_status',
-        'date_offered',
-        'date_accepted',
-        'date_rejected'
-    ]
-    
-    list_filter = [
-        'offer_status',
-        'date_offered',
-        'application__job__job_type'
-    ]
-    
-    search_fields = [
-        'application__job__job_title',
-        'application__freelancer_id',
-        'offer_details'
-    ]
-    
-    readonly_fields = ['date_offered']
-    
-    fieldsets = (
-        ('Offer Information', {
-            'fields': (
-                'application',
-                'offer_status',
-                'offer_details'
-            )
-        }),
-        ('Dates', {
-            'fields': (
-                'date_offered',
-                'date_accepted',
-                'date_rejected'
-            )
-        })
+    list_display = (
+        "application_link",
+        "offer_status",
+        "date_offered",
+        "date_accepted",
+        "date_rejected",
     )
-    
-    def get_readonly_fields(self, request, obj=None):
-        """Make certain fields readonly when editing"""
-        if obj:  # editing an existing object
-            return self.readonly_fields + ['application', 'date_offered']
-        return self.readonly_fields
+
+    list_filter = ("offer_status",)
+    search_fields = ("application__job__job_title",)
+    ordering = ("-date_offered",)
+    list_per_page = 25
+
+    def application_link(self, obj):
+        if not obj.application:
+            return "—"
+        url = reverse("admin:jobs_jobapplication_change", args=[obj.application.id])
+        return format_html('<a href="{}">Application #{}</a>', url, obj.application.id)
+
+    application_link.short_description = "Application"
 
 
+# =====================================================
+# WITHDRAWALS
+# =====================================================
 @admin.register(ApplicationWithdrawal)
 class ApplicationWithdrawalAdmin(admin.ModelAdmin):
-    """
-    Admin interface for ApplicationWithdrawal model
-    """
-    list_display = [
-        'id',
-        'application',
-        'withdrawal_date',
-        'reason'
-    ]
-    
-    list_filter = [
-        'withdrawal_date',
-        'application__job__job_type'
-    ]
-    
-    search_fields = [
-        'application__job__job_title',
-        'application__freelancer_id',
-        'reason'
-    ]
-    
-    readonly_fields = ['withdrawal_date']
-    
-    fieldsets = (
-        ('Withdrawal Information', {
-            'fields': (
-                'application',
-                'reason',
-                'withdrawal_date'
-            )
-        }),
+    list_display = (
+        "application_link",
+        "withdrawal_date",
+        "reason",
     )
-    
-    def get_readonly_fields(self, request, obj=None):
-        """Make certain fields readonly when editing"""
-        if obj:  # editing an existing object
-            return self.readonly_fields + ['application', 'withdrawal_date']
-        return self.readonly_fields
+
+    search_fields = ("application__job__job_title", "reason")
+    ordering = ("-withdrawal_date",)
+    list_per_page = 25
+
+    def application_link(self, obj):
+        if not obj.application:
+            return "—"
+        url = reverse("admin:jobs_jobapplication_change", args=[obj.application.id])
+        return format_html('<a href="{}">Application #{}</a>', url, obj.application.id)
+
+    application_link.short_description = "Application"

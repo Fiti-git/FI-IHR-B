@@ -1,91 +1,139 @@
 from django.contrib import admin
-from django.utils.html import format_html
-from django.utils.timezone import localtime
+from django.http import JsonResponse
+from django.urls import path
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
 from .models import SupportTicket
-import json
+from django.contrib.auth.models import User
 
-# Bulk Actions
-@admin.action(description="Mark selected tickets as Resolved")
-def make_resolved(modeladmin, request, queryset):
-    updated_count = queryset.update(status='resolved')
-    modeladmin.message_user(request, f"{updated_count} ticket(s) marked as resolved.")
 
-@admin.action(description="Mark selected tickets as Closed")
-def make_closed(modeladmin, request, queryset):
-    updated_count = queryset.update(status='closed')
-    modeladmin.message_user(request, f"{updated_count} ticket(s) marked as closed.")
-
-@admin.action(description="Mark selected tickets as Open")
-def make_open(modeladmin, request, queryset):
-    updated_count = queryset.update(status='open')
-    modeladmin.message_user(request, f"{updated_count} ticket(s) marked as open.")
-
+@admin.register(SupportTicket)
 class SupportTicketAdmin(admin.ModelAdmin):
+    change_form_template = "admin/support/supportticket/change_form.html"
+
     list_display = (
-        'id', 'subject', 'user_link', 'ticket_type', 'category',
-        'priority', 'status', 'created_at_local', 'updated_at_local', 'assigned_to_link'
+        "id",
+        "subject",
+        "user",
+        "status",
+        "priority",
+        "assigned_to",
+        "created_at",
     )
-    list_filter = ('status', 'priority', 'category', 'ticket_type', 'created_at')
-    search_fields = ('subject', 'description', 'user__username', 'reference_title')
-    readonly_fields = ('created_at', 'updated_at', 'pretty_messages')
-    ordering = ('-created_at',)
-    actions = [make_resolved, make_closed, make_open]
-    autocomplete_fields = ['user', 'assigned_to']
+
+    readonly_fields = ("created_at", "updated_at")
 
     fieldsets = (
-        (None, {
-            'fields': (
-                'subject', 'user', 'ticket_type', 'reference_id', 'reference_title',
-                'category', 'priority', 'status', 'assigned_to'
-            )
-        }),
-        ('Description', {
-            'fields': ('description',),
-        }),
-        ('Messages (Read-only)', {
-            'fields': ('pretty_messages',),
-            'description': 'Conversation history in JSON format',
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-        }),
+        ("User Information", {"fields": ("user",)}),
+        ("Ticket Reference", {"fields": ("ticket_type", "reference_id", "reference_title")}),
+        ("Ticket Content", {"fields": ("category", "subject", "description")}),
+        ("Status & Assignment", {"fields": ("status", "priority", "assigned_to")}),
+        ("Chat Messages", {"fields": ("messages",)}),
+        ("System Info", {"fields": ("created_at", "updated_at")}),
     )
 
-    # Link to related user admin page
-    def user_link(self, obj):
-        if obj.user:
-            url = f"/admin/auth/user/{obj.user.id}/change/"
-            return format_html('<a href="{}">{}</a>', url, obj.user.username)
-        return "-"
-    user_link.short_description = "User"
-    user_link.admin_order_field = 'user__username'
+    # ----------------------------
+    # Restrict tickets to assigned user
+    # ----------------------------
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(assigned_to=request.user)
 
-    def assigned_to_link(self, obj):
-        if obj.assigned_to:
-            url = f"/admin/auth/user/{obj.assigned_to.id}/change/"
-            return format_html('<a href="{}">{}</a>', url, obj.assigned_to.username)
-        return "-"
-    assigned_to_link.short_description = "Assigned To"
-    assigned_to_link.admin_order_field = 'assigned_to__username'
+    # ----------------------------
+    # Restrict editing to assigned user
+    # ----------------------------
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return True  # List view
+        return obj.assigned_to == request.user
 
-    # Format timestamps to local timezone and readable format
-    def created_at_local(self, obj):
-        return localtime(obj.created_at).strftime('%Y-%m-%d %H:%M:%S')
-    created_at_local.short_description = 'Created At'
-    created_at_local.admin_order_field = 'created_at'
+    # ----------------------------
+    # Disable deletion completely
+    # ----------------------------
+    def has_delete_permission(self, request, obj=None):
+        return False
 
-    def updated_at_local(self, obj):
-        return localtime(obj.updated_at).strftime('%Y-%m-%d %H:%M:%S')
-    updated_at_local.short_description = 'Updated At'
-    updated_at_local.admin_order_field = 'updated_at'
+    # ----------------------------
+    # Lock form if ticket is closed
+    # ----------------------------
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.status == "closed":
+            return [f.name for f in obj._meta.fields]
+        return self.readonly_fields
 
-    # Pretty print JSON messages, safely handle errors
-    def pretty_messages(self, obj):
-        try:
-            formatted_json = json.dumps(obj.messages, indent=2, ensure_ascii=False)
-            return format_html('<pre style="white-space: pre-wrap; max-width: 700px; background: #f7f7f7; padding: 10px; border-radius: 4px;">{}</pre>', formatted_json)
-        except Exception:
-            return obj.messages
-    pretty_messages.short_description = "Messages"
+    # ----------------------------
+    # Custom admin URLs for AJAX
+    # ----------------------------
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<int:ticket_id>/reply/",
+                self.admin_site.admin_view(self.ajax_reply),
+                name="supportticket_reply",
+            ),
+            path(
+                "<int:ticket_id>/set-status/<str:status>/",
+                self.admin_site.admin_view(self.ajax_set_status),
+                name="supportticket_set_status",
+            ),
+        ]
+        return custom_urls + urls
 
-admin.site.register(SupportTicket, SupportTicketAdmin)
+    # ----------------------------
+    # AJAX: add a reply
+    # ----------------------------
+    @method_decorator(csrf_exempt)
+    def ajax_reply(self, request, ticket_id):
+        if request.method != "POST":
+            return JsonResponse({"error": "Invalid request"}, status=400)
+
+        ticket = SupportTicket.objects.get(pk=ticket_id)
+        # Ensure only assigned user or superuser can reply
+        if not request.user.is_superuser and ticket.assigned_to != request.user:
+            return JsonResponse({"error": "Not allowed"}, status=403)
+
+        message = request.POST.get("message", "").strip()
+        if not message:
+            return JsonResponse({"error": "Empty message"}, status=400)
+
+        ticket.messages.append({
+            "sender": "support",
+            "sender_id": request.user.id,
+            "message": message,
+            "timestamp": timezone.now().isoformat(),
+        })
+
+        ticket.save(update_fields=["messages", "updated_at"])
+        return JsonResponse({"success": True})
+
+    # ----------------------------
+    # AJAX: set status (resolve/close)
+    # ----------------------------
+    @method_decorator(csrf_exempt)
+    def ajax_set_status(self, request, ticket_id, status):
+        if status not in ["resolved", "closed"]:
+            return JsonResponse({"error": "Invalid status"}, status=400)
+
+        ticket = SupportTicket.objects.get(pk=ticket_id)
+        # Ensure only assigned user or superuser can change status
+        if not request.user.is_superuser and ticket.assigned_to != request.user:
+            return JsonResponse({"error": "Not allowed"}, status=403)
+
+        old_status = ticket.status
+        ticket.status = status
+
+        ticket.messages.append({
+            "sender": "system",
+            "message": f"Ticket status changed from {old_status} to {status}",
+            "timestamp": timezone.now().isoformat(),
+        })
+
+        ticket.save(update_fields=["status", "messages", "updated_at"])
+        return JsonResponse({"success": True, "status": status})

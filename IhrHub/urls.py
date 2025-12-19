@@ -63,7 +63,7 @@ urlpatterns = [
     # path('api/profiles/', include('profiles.urls')), #added by thanidu
 
     # Login and Registration routes
-    path('myapi/', include('myapi.urls')),
+    path('api/myapi/', include('myapi.urls')),
 
     # Custom route for user roles
     path('api/user/<int:user_id>/roles/', views.get_user_roles, name='get_user_roles'),
@@ -80,6 +80,9 @@ urlpatterns = [
 
     #choice manager
     path('api/', include('choices_manager.urls')),
+
+    #cms
+    path('api/', include('cms.urls')),
 ]
 
 # Serve media files during development

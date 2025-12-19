@@ -92,7 +92,11 @@ class FreelancerProfile(models.Model):
     updated_at = models.DateTimeField(default=now)
 
     def __str__(self):
-        return f"{self.user.username}'s Freelancer Profile"
+        return f"{self.user.username}'s Candidate Profile"
+
+    class Meta:
+        verbose_name = "Candidate"
+        verbose_name_plural = "Candidates"
 
 
 class JobProviderProfile(models.Model):
@@ -145,8 +149,8 @@ class JobProviderProfile(models.Model):
     updated_at = models.DateTimeField(default=now)
     
     def __str__(self):
-        return f"{self.company_name} - Profile"
-    
+        return f"{self.company_name} - Employer"
+
     class Meta:
-        verbose_name = "Job Provider Profile"
-        verbose_name_plural = "Job Provider Profiles"
+        verbose_name = "Employer"
+        verbose_name_plural = "Employers"
