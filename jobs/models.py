@@ -20,23 +20,23 @@ class JobPosting(models.Model):
     department = models.CharField(max_length=100, help_text="Department or team the job belongs to")
     job_type = models.CharField(
         max_length=50, 
-        choices=[
-            ('full-time', 'Full-time'),
-            ('part-time', 'Part-time'),
-            ('contract', 'Contract'),
-            ('internship', 'Internship'),
-            ('temporary', 'Temporary'),
-        ],
+        # choices=[
+        #     ('full-time', 'Full-time'),
+        #     ('part-time', 'Part-time'),
+        #     ('contract', 'Contract'),
+        #     ('internship', 'Internship'),
+        #     ('temporary', 'Temporary'),
+        # ],
         help_text="Job type"
     )
     work_location = models.CharField(max_length=255, help_text="Work area")
     work_mode = models.CharField(
         max_length=20,
-        choices=[
-            ('on-site', 'On-site'),
-            ('remote', 'Remote'),
-            ('hybrid', 'Hybrid'),
-        ],
+        # choices=[
+        #     ('on-site', 'On-site'),
+        #     ('remote', 'Remote'),
+        #     ('hybrid', 'Hybrid'),
+        # ],
         help_text="Mode of work"
     )
     
@@ -48,18 +48,18 @@ class JobPosting(models.Model):
     languages_required = models.CharField(max_length=255, blank=True, null=True, help_text="Required languages")
     job_category = models.CharField(
         max_length=100,
-        choices=[
-            ('engineering', 'Engineering'),
-            ('marketing', 'Marketing'),
-            ('sales', 'Sales'),
-            ('human resources', 'Human Resources'),
-            ('finance', 'Finance'),
-            ('operations', 'Operations'),
-            ('design', 'Design'),
-            ('product', 'Product'),
-            ('customer-support', 'Customer Support'),
-            ('other', 'Other'),
-        ],
+        # choices=[
+        #     ('engineering', 'Engineering'),
+        #     ('marketing', 'Marketing'),
+        #     ('sales', 'Sales'),
+        #     ('human resources', 'Human Resources'),
+        #     ('finance', 'Finance'),
+        #     ('operations', 'Operations'),
+        #     ('design', 'Design'),
+        #     ('product', 'Product'),
+        #     ('customer-support', 'Customer Support'),
+        #     ('other', 'Other'),
+        # ],
         help_text="Job category"
     )
     
@@ -80,12 +80,12 @@ class JobPosting(models.Model):
     )
     currency = models.CharField(
         max_length=3,
-        choices=[
-            ('USD', 'USD'),
-            ('AED', 'AED'),
-            ('EUR', 'EUR'),
-            ('GBP', 'GBP'),
-        ],
+        # choices=[
+        #     ('USD', 'USD'),
+        #     ('AED', 'AED'),
+        #     ('EUR', 'EUR'),
+        #     ('GBP', 'GBP'),
+        # ],
         default='USD',
         help_text="Currency"
     )
@@ -94,21 +94,21 @@ class JobPosting(models.Model):
     application_deadline = models.DateTimeField(blank=True, null=True, help_text="Deadline to apply")
     application_method = models.CharField(
         max_length=20,
-        choices=[
-            ('portal', 'Portal'),
-            ('email', 'Email'),
-        ],
+        # choices=[
+        #     ('portal', 'Portal'),
+        #     ('email', 'Email'),
+        # ],
         default='portal',
         help_text="Application method"
     )
     interview_mode = models.CharField(
         max_length=20,
-        choices=[
-            ('in-person', 'In-person'),
-            ('zoom', 'Zoom'),
-            ('phone', 'Phone'),
-            ('hybrid', 'Hybrid'),
-        ],
+        # choices=[
+        #     ('in-person', 'In-person'),
+        #     ('zoom', 'Zoom'),
+        #     ('phone', 'Phone'),
+        #     ('hybrid', 'Hybrid'),
+        # ],
         help_text="Interview mode"
     )
     hiring_manager = models.CharField(max_length=255, help_text="Name of the hiring manager")
@@ -130,12 +130,12 @@ class JobPosting(models.Model):
     date_posted = models.DateTimeField(auto_now_add=True, help_text="Date the job was posted")
     job_status = models.CharField(
         max_length=20,
-        choices=[
-            ('open', 'Open'),
-            ('closed', 'Closed'),
-            ('filled', 'Filled'),
-            ('paused', 'Paused'),
-        ],
+        # choices=[
+        #     ('open', 'Open'),
+        #     ('closed', 'Closed'),
+        #     ('filled', 'Filled'),
+        #     ('paused', 'Paused'),
+        # ],
         default='open',
         help_text="Job status"
     )
@@ -184,13 +184,13 @@ class JobApplication(models.Model):
     # Column 7: status
     status = models.CharField(
         max_length=20,
-        choices=[
-            ('Pending', 'Pending'),
-            ('Accepted', 'Accepted'),
-            ('Rejected', 'Rejected'),
-            ('Save for Later', 'Save for Later'),
-            ('Withdrawn', 'Withdrawn'),
-        ],
+        # choices=[
+        #     ('Pending', 'Pending'),
+        #     ('Accepted', 'Accepted'),
+        #     ('Rejected', 'Rejected'),
+        #     ('Save for Later', 'Save for Later'),
+        #     ('Withdrawn', 'Withdrawn'),
+        # ],
         default='Pending',
         help_text="Application status (Pending, Accepted, Rejected, Save for Later, Withdrawn)"
     )
@@ -282,26 +282,26 @@ class JobInterview(models.Model):
     # Column 4: interview_mode
     interview_mode = models.CharField(
         max_length=20,
-        choices=[
-            ('in-person', 'In-person'),
-            ('zoom', 'Zoom'),
-            ('phone', 'Phone'),
-            ('teams', 'Microsoft Teams'),
-            ('google-meet', 'Google Meet'),
-        ],
+        # choices=[
+        #     ('in-person', 'In-person'),
+        #     ('zoom', 'Zoom'),
+        #     ('phone', 'Phone'),
+        #     ('teams', 'Microsoft Teams'),
+        #     ('google-meet', 'Google Meet'),
+        # ],
         help_text="Mode of the interview (In-person, Zoom, etc.)"
     )
     
     # Column 5: status
     status = models.CharField(
         max_length=20,
-        choices=[
-            ('Scheduled', 'Scheduled'),
-            ('Completed', 'Completed'),
-            ('Cancelled', 'Cancelled'),
-            ('Rescheduled', 'Rescheduled'),
-            ('No-show', 'No-show'),
-        ],
+        # choices=[
+        #     ('Scheduled', 'Scheduled'),
+        #     ('Completed', 'Completed'),
+        #     ('Cancelled', 'Cancelled'),
+        #     ('Rescheduled', 'Rescheduled'),
+        #     ('No-show', 'No-show'),
+        # ],
         default='Scheduled',
         help_text="Interview status (Scheduled, Completed, etc.)"
     )
@@ -386,12 +386,12 @@ class JobOffer(models.Model):
     # Column 3: offer_status
     offer_status = models.CharField(
         max_length=20,
-        choices=[
-            ('Pending', 'Pending'),
-            ('Accepted', 'Accepted'),
-            ('Rejected', 'Rejected'),
-            ('Withdrawn', 'Withdrawn'),
-        ],
+        # choices=[
+        #     ('Pending', 'Pending'),
+        #     ('Accepted', 'Accepted'),
+        #     ('Rejected', 'Rejected'),
+        #     ('Withdrawn', 'Withdrawn'),
+        # ],
         default='Pending',
         help_text="Status of the offer (Pending, Accepted, Rejected)"
     )

@@ -5,12 +5,12 @@ from django.utils import timezone
 from profiles.models import JobProviderProfile
 
 
-
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name']
-        ref_name = 'ProjectUserSerializer'  # 👈 add this line add by thanidu
+        ref_name = 'ProjectUserSerializer'
+
 
 class ProjectTagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -25,15 +25,15 @@ class ProjectSerializer(serializers.ModelSerializer):
     country_name = serializers.CharField(source='user.job_provider_profile.get_country_display', read_only=True)
     project_count = serializers.SerializerMethodField()
     join_date = serializers.DateTimeField(source='user.date_joined', read_only=True)
-    
+
     class Meta:
         model = Project
         fields = [
-            'id', 'user', 'title', 'description', 'category', 
-            'budget', 'project_type', 'deadline', 'visibility', 'status','image', 'image_url',
+            'id', 'user', 'title', 'description', 'category',
+            'budget', 'project_type', 'deadline', 'visibility', 'status', 'image', 'image_url',
             'created_at', 'updated_at', 'company_name', 'country_name', 'project_count', 'join_date'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'user','country_name', 'company_name', 'project_count', 'join_date']
+        read_only_fields = ['created_at', 'updated_at', 'user', 'country_name', 'company_name', 'project_count', 'join_date']
 
     def get_company_name(self, obj):
         try:
@@ -48,13 +48,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             return profile.country_name
         except JobProviderProfile.DoesNotExist:
             return None
-        
+
     def get_project_count(self, obj):
-        """Count how many projects this job provider (user) has."""
         return Project.objects.filter(user=obj.user).count()
-        
+
     def get_image_url(self, obj):
-        """Return full URL for image"""
         if obj.image:
             request = self.context.get('request')
             if request:
@@ -63,45 +61,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         return None
 
     def create(self, validated_data):
-        """Create project instance - user will be set by perform_create in view"""
         return Project.objects.create(**validated_data)
 
     def validate_budget(self, value):
-        """Validate budget is greater than zero"""
         if value <= 0:
             raise serializers.ValidationError("Budget must be greater than zero")
         return value
-    
+
     def validate_deadline(self, value):
-        """Validate deadline is in the future"""
         if value < timezone.now():
             raise serializers.ValidationError("Deadline must be in the future")
-        return value
-    
-    def validate_project_type(self, value):
-        """Validate project_type field"""
-        valid_types = ['fixed_price', 'hourly']
-        if value not in valid_types:
-            raise serializers.ValidationError(
-                f"Invalid project type. Must be one of: {', '.join(valid_types)}"
-            )
-        return value
-    
-    def validate_visibility(self, value):
-        """Validate visibility field"""
-        valid_visibility = ['public', 'private']
-        if value not in valid_visibility:
-            raise serializers.ValidationError(
-                f"Invalid visibility. Must be one of: {', '.join(valid_visibility)}"
-            )
-        return value
-    
-    def validate_status(self, value):
-        valid_statuses = ['open', 'in_progress', 'completed', 'closed']
-        if value not in valid_statuses:
-            raise serializers.ValidationError(
-                f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
-            )
         return value
 
 
@@ -109,8 +78,6 @@ class ProposalSerializer(serializers.ModelSerializer):
     freelancer = UserSerializer(read_only=True)
     freelancer_id = serializers.IntegerField(write_only=True, required=False)
     project_title = serializers.CharField(source='project.title', read_only=True)
-
-    # 👇 Add this new field for chat_users participants
     chat_users = serializers.SerializerMethodField()
 
     class Meta:
@@ -118,12 +85,11 @@ class ProposalSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'project', 'project_title', 'freelancer', 'freelancer_id',
             'budget', 'cover_letter', 'status', 'submitted_at', 'updated_at',
-            'chat_users',  # include here
+            'chat_users',
         ]
         read_only_fields = ['submitted_at', 'updated_at']
 
     def create(self, validated_data):
-        """Attach freelancer automatically if not provided"""
         if 'freelancer_id' not in validated_data:
             validated_data['freelancer'] = self.context['request'].user
         else:
@@ -132,28 +98,21 @@ class ProposalSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def validate_project(self, value):
-        """Validate project is still open"""
         if value.status != 'open':
             raise serializers.ValidationError("Cannot submit proposal for a closed project")
         return value
 
     def validate_budget(self, value):
-        """Validate budget is greater than zero"""
         if value <= 0:
             raise serializers.ValidationError("Budget must be greater than zero")
         return value
 
     def get_chat_users(self, obj):
-        """
-        Return [freelancer_user_id, job_provider_user_id]
-        Both are from the auth User table.
-        """
         try:
-            freelancer_id = obj.freelancer.id  # User table
-            job_provider_id = obj.project.user.id  # User table
+            freelancer_id = obj.freelancer.id
+            job_provider_id = obj.project.user.id
             return [freelancer_id, job_provider_id]
-        except Exception as e:
-            # fallback if something is missing
+        except Exception:
             return []
 
 
@@ -162,32 +121,28 @@ class MilestoneSerializer(serializers.ModelSerializer):
     freelancer_id = serializers.IntegerField(write_only=True, required=False)
     project_title = serializers.CharField(source='project.title', read_only=True)
     remaining_time = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Milestone
         fields = [
             'id', 'project', 'project_title', 'freelancer', 'freelancer_id',
-            'name', 'start_date', 'end_date', 'budget', 'status', 
+            'name', 'start_date', 'end_date', 'budget', 'status',
             'description', 'created_at', 'updated_at', 'remaining_time'
         ]
         read_only_fields = ['created_at', 'updated_at']
-    
+
     def get_remaining_time(self, obj):
         if obj.end_date > timezone.now():
             return (obj.end_date - timezone.now()).days
         return 0
-    
+
     def validate(self, data):
-        """Validate milestone dates"""
         if 'start_date' in data and 'end_date' in data:
             if data['end_date'] <= data['start_date']:
-                raise serializers.ValidationError(
-                    "End date must be after start date"
-                )
+                raise serializers.ValidationError("End date must be after start date")
         return data
-    
+
     def validate_budget(self, value):
-        """Validate budget is greater than zero"""
         if value <= 0:
             raise serializers.ValidationError("Budget must be greater than zero")
         return value
@@ -198,7 +153,7 @@ class MilestonePaymentSerializer(serializers.ModelSerializer):
     freelancer_id = serializers.IntegerField(write_only=True, required=False)
     milestone_name = serializers.CharField(source='milestone.name', read_only=True)
     project_title = serializers.CharField(source='project.title', read_only=True)
-    
+
     class Meta:
         model = MilestonePayment
         fields = [
@@ -207,9 +162,8 @@ class MilestonePaymentSerializer(serializers.ModelSerializer):
             'payment_date', 'payment_method', 'created_at', 'released_at'
         ]
         read_only_fields = ['created_at', 'released_at']
-    
+
     def validate_payment_amount(self, value):
-        """Validate payment amount is greater than zero"""
         if value <= 0:
             raise serializers.ValidationError("Payment amount must be greater than zero")
         return value
@@ -221,7 +175,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
     freelancer = UserSerializer(read_only=True)
     freelancer_id = serializers.IntegerField(write_only=True, required=False)
     project_title = serializers.CharField(source='project.title', read_only=True)
-    
+
     class Meta:
         model = Feedback
         fields = [
@@ -229,7 +183,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
             'freelancer', 'freelancer_id', 'rating', 'feedback', 'submitted_at'
         ]
         read_only_fields = ['submitted_at']
-    
+
     def create(self, validated_data):
         if 'client_id' not in validated_data:
             validated_data['client'] = self.context['request'].user
@@ -237,9 +191,8 @@ class FeedbackSerializer(serializers.ModelSerializer):
             client_id = validated_data.pop('client_id')
             validated_data['client_id'] = client_id
         return super().create(validated_data)
-    
+
     def validate_rating(self, value):
-        """Validate rating is between 1 and 5"""
         if value < 1 or value > 5:
             raise serializers.ValidationError("Rating must be between 1 and 5")
         return value
