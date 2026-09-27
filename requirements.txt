@@ -53,6 +53,7 @@ whitenoise
 
 # Admin Interface
 django-grappelli
+django-jazzmin
 
 # Data Import/Export
 django-import-export
