@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -139,6 +140,22 @@ class JobPosting(models.Model):
         default='open',
         help_text="Job status"
     )
+    # Assignment & admin reference
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_jobs',
+        help_text="User assigned to manage this job posting"
+    )
+
+    reference_added_by_admin = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Internal reference or note added by admin"
+    )
+
     
     class Meta:
         db_table = 'job_posting'
@@ -215,7 +232,7 @@ class JobApplication(models.Model):
         null=True,
         help_text="Comments from job provider review"
     )
-    
+    reference_added_by_admin = models.TextField(null=True, blank=True)
     class Meta:
         db_table = 'job_application'
         ordering = ['-date_applied']

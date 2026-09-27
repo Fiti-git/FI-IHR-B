@@ -1,16 +1,17 @@
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group,Permission
 from django.contrib.auth import authenticate
-
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import JsonResponse
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
+from django.contrib.contenttypes.models import ContentType
+from django.utils.timesince import timesince
 
 
 @ensure_csrf_cookie
@@ -150,3 +151,140 @@ class SetRoleView(APIView):
             {"message": f"Role '{role}' assigned successfully"},
             status=status.HTTP_200_OK
         )
+
+
+class AdminUserPermissionsAPIView(APIView):
+    """
+    Admin API to get all users with their groups and permissions
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        users = User.objects.all().prefetch_related(
+            "groups",
+            "user_permissions"
+        )
+
+        data = []
+
+        for user in users:
+            group_permissions = Permission.objects.filter(
+                group__user=user
+            ).distinct()
+
+            all_permissions = set(
+                list(user.user_permissions.all()) +
+                list(group_permissions)
+            )
+
+            data.append({
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "is_active": user.is_active,
+                "is_staff": user.is_staff,
+                "groups": [g.name for g in user.groups.all()],
+                "permissions": [
+                    {
+                        "id": p.id,
+                        "codename": p.codename,
+                        "name": p.name,
+                        "app": p.content_type.app_label
+                    }
+                    for p in all_permissions
+                ]
+            })
+
+        return Response(data)
+
+class MyPermissionsAPIView(APIView):
+    """
+    Returns permissions of the logged-in user only
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Direct permissions
+        user_permissions = user.user_permissions.all()
+
+        # Group permissions
+        group_permissions = Permission.objects.filter(
+            group__user=user
+        ).distinct()
+
+        all_permissions = set(user_permissions) | set(group_permissions)
+
+        data = {
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "is_staff": user.is_staff,
+                "groups": list(user.groups.values_list("name", flat=True)),
+            },
+            "permissions": [
+                {
+                    "id": perm.id,
+                    "codename": perm.codename,
+                    "name": perm.name,
+                    "app": perm.content_type.app_label,
+                }
+                for perm in all_permissions
+            ],
+        }
+
+        return Response(data)
+    
+class RecentAdminActionsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Filter actions only for logged-in user
+        queryset = LogEntry.objects.filter(user=request.user).order_by('-action_time')[:20]
+
+        actions = []
+        for entry in queryset:
+            if entry.action_flag == ADDITION:
+                action_type = "Added"
+            elif entry.action_flag == CHANGE:
+                action_type = "Changed"
+            elif entry.action_flag == DELETION:
+                action_type = "Deleted"
+            else:
+                action_type = "Action"
+
+            object_repr = entry.object_repr or "Object"
+            time_ago = timesince(entry.action_time) + " ago"
+            description = f"{action_type} {object_repr}."
+
+            if entry.change_message and entry.change_message != "{}":
+                description += f" {entry.change_message}"
+
+            actions.append({
+                "id": entry.id,
+                "time_ago": time_ago,
+                "object": object_repr,
+                "description": description,
+                "user": entry.user.username,
+            })
+
+        return Response(actions)
+    
+class LoggedInUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        data = {
+            "id": user.id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+        }
+
+        return Response(data)
+    

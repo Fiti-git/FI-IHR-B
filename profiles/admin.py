@@ -58,6 +58,7 @@ class FreelancerProfileAdmin(ReadOnlyUserMixin, SoftActionMixin, admin.ModelAdmi
         "is_active",
         "created_at",
         "updated_at",
+        "role_fillter",
     )
 
     list_filter = (
@@ -68,6 +69,7 @@ class FreelancerProfileAdmin(ReadOnlyUserMixin, SoftActionMixin, admin.ModelAdmi
         "gender",
         "is_active",
         "is_verified",
+        "role_fillter",
     )
 
     search_fields = (

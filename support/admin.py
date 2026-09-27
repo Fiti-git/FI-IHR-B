@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 
 @admin.register(SupportTicket)
 class SupportTicketAdmin(admin.ModelAdmin):
-    change_form_template = "admin/support/supportticket/change_form.html"
+  #  change_form_template = "admin/support/supportticket/change_form.html"
 
     list_display = (
         "id",

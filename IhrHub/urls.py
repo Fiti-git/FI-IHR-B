@@ -30,7 +30,8 @@ schema_view = get_schema_view(
 urlpatterns = [
     # Admin ui
     #path('grappelli/', include('grappelli.urls')),
-    # path('', login_page, name='login_page'),
+    # path('', login_page, name='login_page')
+    
     path('admin/', admin.site.urls),
 
     # Authentication routes
@@ -83,6 +84,9 @@ urlpatterns = [
 
     #cms
     path('api/', include('cms.urls')),
+
+    path('api/', include('cadmin.urls')), 
+    
 ]
 
 # Serve media files during development

@@ -9,6 +9,7 @@ from .models import (
     JobOffer,
     ApplicationWithdrawal,
 )
+
 from profiles.models import FreelancerProfile
 
 
@@ -141,6 +142,7 @@ class JobApplicationAdmin(admin.ModelAdmin):
         "id",
         "job_link",
         "candidate_link",
+        "candidate_title",
         "status",
         "expected_rate",
         "date_applied",
@@ -150,7 +152,7 @@ class JobApplicationAdmin(admin.ModelAdmin):
     )
 
     list_filter = ("status",)
-    search_fields = ("job__job_title",)
+    search_fields = ("job__job_title", "freelancer_id__user__username")
     ordering = ("-date_applied",)
     list_per_page = 25
 
@@ -171,6 +173,8 @@ class JobApplicationAdmin(admin.ModelAdmin):
         }),
     )
 
+    # ---------- LINKS & PROFILE DATA ----------
+
     def job_link(self, obj):
         if not obj.job:
             return "—"
@@ -180,9 +184,10 @@ class JobApplicationAdmin(admin.ModelAdmin):
     job_link.short_description = "Job"
 
     def candidate_link(self, obj):
-        profile = FreelancerProfile.objects.filter(id=obj.freelancer_id).select_related("user").first()
+        profile = obj.freelancer_id
         if not profile:
             return "—"
+
         url = reverse(
             "admin:profiles_freelancerprofile_change",
             args=[profile.id],
@@ -195,9 +200,18 @@ class JobApplicationAdmin(admin.ModelAdmin):
 
     candidate_link.short_description = "Candidate"
 
+    def candidate_title(self, obj):
+        profile = obj.freelancer_id
+        return profile.professional_title if profile else "—"
+
+    candidate_title.short_description = "Title"
+
     def resume_link(self, obj):
         if obj.resume:
-            return format_html('<a href="{}" target="_blank">Download</a>', obj.resume.url)
+            return format_html(
+                '<a href="{}" target="_blank">Download</a>',
+                obj.resume.url
+            )
         return "—"
 
     resume_link.short_description = "Resume"
@@ -208,7 +222,6 @@ class JobApplicationAdmin(admin.ModelAdmin):
         return obj.cover_letter[:50] + ("..." if len(obj.cover_letter) > 50 else "")
 
     cover_letter_preview.short_description = "Cover Letter"
-
 
 # =====================================================
 # INTERVIEWS
