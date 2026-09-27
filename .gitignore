@@ -50,10 +50,8 @@ staticfiles/
 # If you collect static into a “static/” directory:
 static/
 
-# Django migrations
-# (version-control your migrations if you prefer; otherwise ignore them)
-**/migrations/
-!**/migrations/__init__.py
+# Django migrations ARE version-controlled (removed the ignore rule so
+# fresh clones can rebuild the DB schema).
 
 # Unit test / coverage reports
 htmlcov/
