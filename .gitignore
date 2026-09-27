@@ -35,6 +35,11 @@ venv.bak/
 .venv/
 .env/
 
+# Env var files (never commit real secrets; commit .env.example instead)
+.env
+.env.local
+.env.*.local
+
 # Django stuff:
 *.log
 local_settings.py
